@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Blast Hole Diagrammer</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.1.3/dist/svg2pdf.umd.min.js"></script>
+</head>
+
+<body>
+    <header>
+        <h1>Blast Hole Diagrammer</h1>
+        <p>True-scale, print-ready blast hole diagrams from CSV.</p>
+    </header>
+
+    <main>
+        <section class="panel import-panel">
+            <h2>1) CSV Import & Mapping</h2>
+            <div id="dropZone" class="drop-zone">Drop CSV here or <label for="csvFile"
+                    class="inline-link">browse</label><input id="csvFile" type="file" accept=".csv,text/csv" hidden />
+            </div>
+            <div class="controls-row">
+                <label>Coordinate Mode
+                    <select id="coordMode">
+                        <option value="auto">Auto</option>
+                        <option value="planar">Planar (E/N)</option>
+                        <option value="latlon">Lat/Lon</option>
+                    </select>
+                </label>
+                <button id="autoDetectBtn">Re-run auto-detect</button>
+                <button id="resetMappingBtn">Reset mapping</button>
+            </div>
+            <div class="controls-row preset-row">
+                <input id="presetName" placeholder="Preset name" />
+                <button id="savePresetBtn">Save Preset</button>
+                <select id="presetSelect">
+                    <option value="">Load preset...</option>
+                </select>
+                <button id="deletePresetBtn">Delete Preset</button>
+            </div>
+            <div id="mappingGrid" class="mapping-grid"></div>
+            <div id="importSummary" class="summary"></div>
+            <button id="importBtn" disabled>Import Renderable Rows</button>
+            <h3>CSV Preview (first 50 rows)</h3>
+            <div class="preview-wrap">
+                <table id="previewTable"></table>
+            </div>
+        </section>
+
+        <section class="panel config-panel">
+            <h2>2) Diagram Settings</h2>
+            <div class="controls-grid">
+                <label>Page Size <select id="pageSize">
+                        <option value="letter">Letter (11x8.5")</option>
+                    </select></label>
+                <label>Orientation <select id="orientation">
+                        <option value="landscape">Landscape</option>
+                        <option value="portrait">Portrait</option>
+                    </select></label>
+                <label>Units <select id="units">
+                        <option value="ft">Feet</option>
+                        <option value="m">Meters</option>
+                    </select></label>
+                <label>Label Density <select id="labelDensity">
+                        <option value="minimal">Minimal (ID)</option>
+                        <option value="standard" selected>Standard (ID + Depth)</option>
+                        <option value="full">Full (ID + Angle + Depth)</option>
+                    </select></label>
+            </div>
+            <div class="controls-row">
+                <label><input type="checkbox" id="showGrid" /> Grid</label>
+                <label><input type="checkbox" id="showHoleId" checked /> Show Hole ID</label>
+            </div>
+            <h3>Shot Metadata</h3>
+            <div class="controls-grid metadata-grid">
+                <label>Shot Number <input id="metaShot" /></label>
+                <label>Face Pattern <input id="metaFace" /></label>
+                <label>Interior Pattern <input id="metaInterior" /></label>
+                <label>Hole Diameter <input id="metaDiameter" /></label>
+                <label>Bench <input id="metaBench" /></label>
+                <label>Date <input id="metaDate" type="date" /></label>
+            </div>
+            <label>Notes <textarea id="metaNotes" rows="2"></textarea></label>
+            <div class="controls-row">
+                <button id="fitScreenBtn">Fit to Screen</button>
+                <button id="fitPageBtn">Fit to Page</button>
+                <button id="exportPdfBtn">Export PDF</button>
+            </div>
+        </section>
+
+        <section class="panel diagram-panel">
+            <h2>3) Diagram</h2>
+            <div id="diagramWrap" class="diagram-wrap">
+                <svg id="diagramSvg" viewBox="0 0 1100 850"></svg>
+            </div>
+        </section>
+
+        <section class="panel table-panel">
+            <h2>4) Hole Table</h2>
+            <div class="controls-row">
+                <label><input type="checkbox" id="showCoordTable" checked /> Include coordinates</label>
+                <button id="exportTableCsvBtn">Export Table CSV</button>
+            </div>
+            <div class="preview-wrap">
+                <table id="holeTable"></table>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <small>Angle definition: degrees down from horizontal (0° = horizontal, 90° = vertical down).</small>
+    </footer>
+
+    <script type="module" src="app.js"></script>
+</body>
+
+</html>

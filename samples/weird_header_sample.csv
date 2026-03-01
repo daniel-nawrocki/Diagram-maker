@@ -1,0 +1,5 @@
+Hole No,X Coord,Y Coord,Azimuth,Dip,Hole_Depth,Remark
+WH-01,5000,1200,0,10,45,edge
+WH-02,5018,1206,22,12,44,
+WH-03,5039,1211,35,9,46,
+WH-04,5047,1195,189,15,47,interior

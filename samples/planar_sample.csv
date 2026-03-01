@@ -1,0 +1,7 @@
+hole_id,easting,northing,bearing_deg,angle_deg,depth_ft,diameter_in,pattern_type,notes
+F1,1000,2000,15,12,38.5,4.5,face,starter
+F2,1015,1992,22,11,39.0,4.5,face,
+F3,1030,1984,30,10,40.0,4.5,face,
+I1,1006,1970,185,14,42.1,4.5,interior,
+I2,1023,1965,190,14,41.8,4.5,interior,
+I3,1038,1958,200,16,43.0,4.5,interior,wet

@@ -1,0 +1,181 @@
+:root {
+    font-family: Arial, sans-serif;
+    color: #1f2937;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #f5f7fb;
+}
+
+header,
+footer {
+    padding: 0.8rem 1rem;
+    background: #fff;
+    border-bottom: 1px solid #d1d5db;
+}
+
+footer {
+    border-top: 1px solid #d1d5db;
+    border-bottom: none;
+}
+
+main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    padding: 0.75rem;
+}
+
+.panel {
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 0.75rem;
+    min-width: 0;
+}
+
+.diagram-panel,
+.table-panel {
+    grid-column: 1 / -1;
+}
+
+h1,
+h2,
+h3 {
+    margin: 0.4rem 0;
+}
+
+.controls-row {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.controls-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(150px, 1fr));
+    gap: 0.5rem;
+}
+
+.metadata-grid {
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
+}
+
+label {
+    font-size: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+input,
+select,
+textarea,
+button {
+    padding: 0.35rem;
+    font-size: 0.9rem;
+}
+
+button {
+    cursor: pointer;
+    border: 1px solid #9ca3af;
+    border-radius: 4px;
+    background: #f9fafb;
+}
+
+.drop-zone {
+    border: 2px dashed #9ca3af;
+    border-radius: 6px;
+    padding: 0.7rem;
+    margin-bottom: 0.5rem;
+}
+
+.drop-zone.dragover {
+    border-color: #2563eb;
+    background: #eff6ff;
+}
+
+.inline-link {
+    text-decoration: underline;
+    color: #2563eb;
+    cursor: pointer;
+}
+
+.mapping-grid {
+    display: grid;
+    grid-template-columns: 180px minmax(180px, 1fr);
+    gap: 0.35rem 0.6rem;
+    margin: 0.4rem 0;
+}
+
+.mapping-grid .required::after {
+    content: ' *';
+    color: #b91c1c;
+}
+
+.summary {
+    min-height: 1.2rem;
+    font-size: 0.9rem;
+    margin-bottom: 0.4rem;
+}
+
+.preview-wrap {
+    overflow: auto;
+    border: 1px solid #d1d5db;
+    max-height: 280px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+}
+
+th,
+td {
+    border: 1px solid #e5e7eb;
+    padding: 0.2rem 0.35rem;
+    white-space: nowrap;
+}
+
+th {
+    position: sticky;
+    top: 0;
+    background: #f3f4f6;
+    cursor: pointer;
+}
+
+.invalid-cell {
+    background: #fee2e2;
+}
+
+.diagram-wrap {
+    border: 1px solid #d1d5db;
+    background: #fff;
+    min-height: 540px;
+    overflow: hidden;
+}
+
+#diagramSvg {
+    width: 100%;
+    height: 76vh;
+    display: block;
+}
+
+@media (max-width: 1000px) {
+    main {
+        grid-template-columns: 1fr;
+    }
+
+    .controls-grid,
+    .metadata-grid {
+        grid-template-columns: repeat(2, minmax(150px, 1fr));
+    }
+}

@@ -1,3 +1,4 @@
+
 const REQUIRED_BASE = ["hole_id", "bearing_deg", "angle_deg", "depth_ft"];
 const REQUIRED_BY_MODE = {
   planar: ["easting", "northing"],
@@ -210,8 +211,10 @@ function renderDiagram() {
   const ys = rotatedData.map((d) => d.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
   const spanX = Math.max(1, maxX - minX), spanY = Math.max(1, maxY - minY);
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
   const scale = Math.min((W - margin * 2) / spanX, (H - margin * 2) / spanY);
-  const toSvg = (x, y) => ({ x: margin + (x - minX) * scale, y: H - margin - (y - minY) * scale });
+  const toSvg = (x, y) => ({ x: W / 2 + (x - centerX) * scale, y: H / 2 - (y - centerY) * scale });
 
   const root = el("g", { transform: `translate(${state.transform.tx},${state.transform.ty}) scale(${state.transform.scale})` });
   const scene = el("g", { id: "sceneGroup" });
@@ -254,7 +257,7 @@ function renderDiagram() {
     placedLabels.push(box);
   });
 
-  scene.append(drawNorthArrow(W, rotation));
+  scene.append(drawNorthArrow(W));
   scene.append(drawAnnotations(rotation));
   root.append(scene);
   root.append(drawHud(W, H, spanX, scale, usedAngles));
@@ -275,16 +278,14 @@ function rotateProjectedRows(data, rotation) {
       ...d,
       x: relX * cos - relY * sin + cx,
       y: relX * sin + relY * cos + cy,
-      bearing_deg: ((d.bearing_deg + rotation) % 360 + 360) % 360,
     };
   });
 }
 
-function drawNorthArrow(W, rotation) {
+function drawNorthArrow(W) {
   const g = el("g", {});
   const x = W - 75;
   const y = 20;
-  g.setAttribute("transform", rotation ? `rotate(${rotation} ${x} ${y + 14})` : "");
   g.append(el("line", { x1: x, y1: y + 28, x2: x, y2: y, stroke: "#0f172a", "stroke-width": 1.5 }));
   g.append(el("polygon", { points: `${x},${y - 6} ${x - 6},${y + 5} ${x + 6},${y + 5}`, fill: "#0f172a" }));
   g.append(el("text", { x: x - 6, y: y + 40, "font-size": 12, fill: "#0f172a" }, "N"));
@@ -408,7 +409,7 @@ function renderTable() {
   rows.sort((a, b) => compareHoleIds(a.hole_id, b.hole_id));
   const showCoords = $("showCoordTable").checked;
   const coordMode = effectiveMode();
-  const cols = ["hole_id", "bearing_deg", "angle_deg", "depth_ft", ...(showCoords ? (coordMode === "planar" ? ["easting", "northing"] : ["lat", "lon"]) : [])];
+  const cols = ["hole_id", "depth_ft", "angle_deg", "bearing_deg", ...(showCoords ? (coordMode === "planar" ? ["easting", "northing"] : ["lat", "lon"]) : [])];
   const head = `<thead><tr>${cols.map((c) => `<th data-k="${c}">${c}</th>`).join("")}</tr></thead>`;
   const body = rows.map((r) => `<tr>${cols.map((c) => `<td>${typeof r[c] === "number" ? r[c].toFixed(2) : r[c] ?? ""}</td>`).join("")}</tr>`).join("");
   t.innerHTML = head + `<tbody>${body}</tbody>`;
@@ -692,8 +693,10 @@ function setupEvents() {
 
   $("openMetadataBtn").onclick = () => $("metadataDialog").showModal();
   $("openNotesBtn").onclick = () => $("notesDialog").showModal();
+  $("openTableBtn").onclick = () => $("tableDialog").showModal();
   $("closeMetadataBtn").onclick = () => $("metadataDialog").close();
   $("closeNotesBtn").onclick = () => $("notesDialog").close();
+  $("closeTableBtn").onclick = () => $("tableDialog").close();
   $("diagramRotation").addEventListener("change", (e) => {
     e.target.value = String(normalizeRotation(e.target.value));
     renderDiagram();

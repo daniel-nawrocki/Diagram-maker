@@ -12,9 +12,9 @@ It imports arbitrary CSV drill-hole data, lets users map columns, validates rows
   - Page 1 (diagram): Letter Landscape by default
   - Page 2+ (table): Letter Portrait
 - Units: **feet** by default
-- Angle definition: **degrees down from horizontal**
-  - `0° = horizontal`
-  - `90° = vertical down`
+- Angle definition: **degrees from vertical down**
+  - `0° = vertical down`
+  - `10° = 10° off vertical`
 - Label Density default: **Standard**
 
 ## Features
@@ -36,7 +36,7 @@ It imports arbitrary CSV drill-hole data, lets users map columns, validates rows
   - Full: ID + angle + depth
 - Smart label placement (NE/NW/SE/SW/E/W/N/S) with leader-line fallback.
 - Fixed north arrow, auto scale bar, optional grid, clean shot metadata legend.
-- Pan/zoom, Fit to Screen, Fit to Page (orientation-aware).
+- Pan/zoom, Fit to Screen, Fit to Page (orientation-aware), and pre-print diagram rotation (0/90/180/270).
 - Sortable hole table and CSV table export.
 - PDF export: page 1 diagram, subsequent portrait pages for table.
 
@@ -102,4 +102,4 @@ Because this app is static HTML/CSS/JS, deploy by serving repository root via Pa
 
 ## Notes on PDF export
 
-The app uses browser-side `jsPDF` + `svg2pdf.js` for high-legibility static exports.
+The app uses browser-side `jsPDF` and rasterized SVG capture for reliable, legible static exports in a pure client-side environment.

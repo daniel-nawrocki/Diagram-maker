@@ -4,6 +4,14 @@ const REQUIRED_BY_MODE = {
   latlon: ["lat", "lon"],
 };
 const OPTIONAL_FIELDS = ["diameter_in", "pattern_type", "notes"];
+const ANGLE_COLORS = {
+  5: "#ef4444",
+  10: "#f97316",
+  15: "#eab308",
+  20: "#22c55e",
+  25: "#0ea5e9",
+  30: "#8b5cf6",
+};
 
 const ALIASES = {
   hole_id: ["hole", "holeid", "id", "hole_number", "hole_no", "number"],
@@ -191,57 +199,88 @@ function renderDiagram() {
   const W = 1100;
   const H = 850;
   const margin = 70;
-  const xs = data.map((d) => d.x);
-  const ys = data.map((d) => d.y);
+  const rotation = Number.parseInt($("printRotation").value || "0", 10) || 0;
+  const rotatedData = rotateProjectedRows(data, rotation);
+  const xs = rotatedData.map((d) => d.x);
+  const ys = rotatedData.map((d) => d.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
   const spanX = Math.max(1, maxX - minX), spanY = Math.max(1, maxY - minY);
   const scale = Math.min((W - margin * 2) / spanX, (H - margin * 2) / spanY);
   const toSvg = (x, y) => ({ x: margin + (x - minX) * scale, y: H - margin - (y - minY) * scale });
 
   const root = el("g", { transform: `translate(${state.transform.tx},${state.transform.ty}) scale(${state.transform.scale})` });
-  const rotation = Number.parseInt($("printRotation").value || "0", 10) || 0;
-  const scene = el("g", { id: "sceneGroup", transform: rotation ? `rotate(${rotation} ${W / 2} ${H / 2})` : "" });
+  const scene = el("g", { id: "sceneGroup" });
 
   if ($("showGrid").checked) scene.appendChild(drawGrid(W, H, 50));
 
   const placedLabels = [];
   scene.append(el("defs", {}, el("marker", { id: "arrowHead", viewBox: "0 0 10 10", refX: "8", refY: "5", markerWidth: "5", markerHeight: "5", orient: "auto-start-reverse" }, el("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "#334155" }))));
-  data.forEach((d) => {
-    const p = toSvg(d.x, d.y);
+  const textScale = Number($("textScale").value) || 1;
+  const usedAngles = new Set();
+  rotatedData.forEach((d) => {
+        const p = toSvg(d.x, d.y);
     const isVertical = Math.abs(d.angle_deg) < 0.01;
     const bearingRad = (d.bearing_deg * Math.PI) / 180;
     const dx = Math.sin(bearingRad) * 24;
     const dy = -Math.cos(bearingRad) * 24;
     scene.append(el("circle", { cx: p.x, cy: p.y, r: 3, fill: "#0f172a" }));
 
+    if ($("showHoleId").checked) {
+      scene.append(el("text", { x: p.x, y: p.y - 6, "font-size": 9 * textScale, fill: "#2563eb", "text-anchor": "middle", "font-weight": 700 }, d.hole_id));
+    }
+
     if (!isVertical) {
-      scene.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: "#475569", "stroke-width": 1.2, "marker-end": "url(#arrowHead)" }));
-      scene.append(el("text", { x: p.x + dx + 4, y: p.y + dy + 3, "font-size": 9, fill: "#0f172a" }, `${d.angle_deg.toFixed(1)}°`));
+      const angle = normalizeAngleValue(d.angle_deg);
+      const angleColor = ANGLE_COLORS[angle] || "#475569";
+      usedAngles.add(angle);
+      scene.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: angleColor, "stroke-width": 1.6, "marker-end": "url(#arrowHead)" }));
+      scene.append(el("text", { x: p.x + dx + 4, y: p.y + dy + 3, "font-size": 9 * textScale, fill: angleColor, "font-weight": 700 }, `${d.angle_deg.toFixed(1)}°`));
     }
 
     const parts = labelParts(d);
     if (!parts.length) return;
     const box = placeLabel(p, parts.map((part) => part.text).join(""), placedLabels);
     if (box.leader) scene.append(el("line", { x1: p.x, y1: p.y, x2: box.x, y2: box.y + box.h * 0.7, stroke: "#94a3b8", "stroke-width": 0.6 }));
-    const label = el("text", { x: box.x, y: box.y + box.h * 0.75, "font-size": 10 });
+    const label = el("text", { x: box.x, y: box.y + box.h * 0.75, "font-size": 10 * textScale });
     parts.forEach((part) => label.append(el("tspan", { fill: part.color }, part.text)));
     scene.append(label);
     placedLabels.push(box);
   });
 
-  scene.append(drawNorthArrow(W));
+  scene.append(drawNorthArrow(W, rotation));
   scene.append(drawAnnotations());
   root.append(scene);
-  root.append(drawHud(W, H, spanX, scale));
+  root.append(drawHud(W, H, spanX, scale, usedAngles));
   svg.append(root);
 }
 
-function drawNorthArrow(W) {
+function rotateProjectedRows(data, rotation) {
+  if (!rotation) return data;
+  const rad = (rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const cx = data.reduce((sum, d) => sum + d.x, 0) / data.length;
+  const cy = data.reduce((sum, d) => sum + d.y, 0) / data.length;
+  return data.map((d) => {
+    const relX = d.x - cx;
+    const relY = d.y - cy;
+    return {
+      ...d,
+      x: relX * cos - relY * sin + cx,
+      y: relX * sin + relY * cos + cy,
+      bearing_deg: ((d.bearing_deg + rotation) % 360 + 360) % 360,
+    };
+  });
+}
+
+function drawNorthArrow(W, rotation) {
   const g = el("g", {});
   const x = W - 75;
-  g.append(el("line", { x1: x, y1: 48, x2: x, y2: 20, stroke: "#0f172a", "stroke-width": 1.5 }));
-  g.append(el("polygon", { points: `${x},14 ${x - 6},25 ${x + 6},25`, fill: "#0f172a" }));
-  g.append(el("text", { x: x - 6, y: 60, "font-size": 12, fill: "#0f172a" }, "N"));
+  const y = 20;
+  g.setAttribute("transform", rotation ? `rotate(${rotation} ${x} ${y + 14})` : "");
+  g.append(el("line", { x1: x, y1: y + 28, x2: x, y2: y, stroke: "#0f172a", "stroke-width": 1.5 }));
+  g.append(el("polygon", { points: `${x},${y - 6} ${x - 6},${y + 5} ${x + 6},${y + 5}`, fill: "#0f172a" }));
+  g.append(el("text", { x: x - 6, y: y + 40, "font-size": 12, fill: "#0f172a" }, "N"));
   return g;
 }
 
@@ -267,13 +306,11 @@ function drawGrid(w, h, step) {
 }
 
 function labelParts(d) {
-  if (!$("showHoleId").checked && $("labelDensity").value === "minimal") return [];
-  const id = d.hole_id;
+  if ($("labelDensity").value === "minimal") return [];
   const depth = `${d.depth_ft.toFixed(1)} ft`;
   const density = $("labelDensity").value;
-  if (density === "minimal") return [{ text: id, color: "#2563eb" }];
-  if (density === "standard") return [{ text: `${id} `, color: "#2563eb" }, { text: depth, color: "#0f172a" }];
-  return [{ text: `${id} `, color: "#2563eb" }, { text: `angle ${d.angle_deg.toFixed(1)}° depth ${depth}`, color: "#0f172a" }];
+  if (density === "standard") return [{ text: depth, color: "#0f172a" }];
+  return [{ text: `angle ${d.angle_deg.toFixed(1)}° depth ${depth}`, color: "#0f172a" }];
 }
 
 function placeLabel(p, txt, occupied) {
@@ -295,7 +332,7 @@ function clear(b, occupied, p) {
 
 const intersects = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
-function drawHud(W, H, spanX, scalePxPerUnit) {
+function drawHud(W, H, spanX, scalePxPerUnit, usedAngles) {
   const g = el("g", {});
   const meta = {
     shot: $("metaShot").value,
@@ -323,7 +360,22 @@ function drawHud(W, H, spanX, scalePxPerUnit) {
     `Hole Ø: ${meta.diam || "-"}`,
     `Bench: ${meta.bench || "-"}    Date: ${meta.date || "-"}`,
   ].forEach((t, i) => g.append(el("text", { x: legendX + 8, y: legendY + 18 + i * 16, "font-size": 11, fill: "#0f172a" }, t)));
+
+  const used = [...usedAngles].filter((a) => ANGLE_COLORS[a]).sort((a, b) => a - b);
+  if (used.length) {
+    const keyY = 18;
+    g.append(el("text", { x: 30, y: keyY, "font-size": 11, fill: "#0f172a", "font-weight": 700 }, "Angle key"));
+    used.forEach((angle, idx) => {
+      const x = 30 + idx * 64;
+      g.append(el("line", { x1: x, y1: keyY + 8, x2: x + 24, y2: keyY + 8, stroke: ANGLE_COLORS[angle], "stroke-width": 3 }));
+      g.append(el("text", { x: x + 28, y: keyY + 12, "font-size": 10, fill: "#0f172a" }, `${angle}°`));
+    });
+  }
   return g;
+}
+
+function normalizeAngleValue(angleDeg) {
+  return Math.round(Number(angleDeg));
 }
 
 function chooseNiceScale(v) {
@@ -340,19 +392,20 @@ function chooseNiceScale(v) {
 function renderTable() {
   const t = $("holeTable");
   const rows = [...state.imported];
-  rows.sort((a, b) => (a[state.sort.key] > b[state.sort.key] ? 1 : -1) * state.sort.dir);
+  rows.sort((a, b) => compareHoleIds(a.hole_id, b.hole_id));
   const showCoords = $("showCoordTable").checked;
   const coordMode = effectiveMode();
   const cols = ["hole_id", "bearing_deg", "angle_deg", "depth_ft", ...(showCoords ? (coordMode === "planar" ? ["easting", "northing"] : ["lat", "lon"]) : [])];
   const head = `<thead><tr>${cols.map((c) => `<th data-k="${c}">${c}</th>`).join("")}</tr></thead>`;
   const body = rows.map((r) => `<tr>${cols.map((c) => `<td>${typeof r[c] === "number" ? r[c].toFixed(2) : r[c] ?? ""}</td>`).join("")}</tr>`).join("");
   t.innerHTML = head + `<tbody>${body}</tbody>`;
-  t.querySelectorAll("th").forEach((th) => {
-    th.onclick = () => {
-      state.sort = { key: th.dataset.k, dir: state.sort.key === th.dataset.k ? -state.sort.dir : 1 };
-      renderTable();
-    };
-  });
+}
+
+function compareHoleIds(a, b) {
+  const aNum = Number.parseFloat(String(a).replace(/[^0-9.-]/g, ""));
+  const bNum = Number.parseFloat(String(b).replace(/[^0-9.-]/g, ""));
+  if (Number.isFinite(aNum) && Number.isFinite(bNum) && aNum !== bNum) return aNum - bNum;
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" });
 }
 
 function exportTableCsv() {
@@ -384,8 +437,7 @@ async function exportPdf() {
     console.error(err);
     return alert("Could not export PDF image. Please try again.");
   }
-
-  const tableRows = [...$("holeTable").querySelectorAll("tr")].map((tr) => [...tr.children].map((c) => c.textContent));
+    const tableRows = [...$("holeTable").querySelectorAll("tr")].map((tr) => [...tr.children].map((c) => c.textContent));
   const header = tableRows[0] || [];
   const bodyRows = tableRows.slice(1);
 
@@ -482,12 +534,14 @@ function bindDiagramInteractions() {
   svg.addEventListener("mousedown", (e) => {
     const tool = $("annotationTool").value;
     if (tool === "draw") {
+      e.preventDefault();
       const p = getScenePoint(e);
       if (!p) return;
       state.drawDraft = { points: [{ x: p.x, y: p.y }], color: $("annotationColor").value, width: Number($("annotationWidth").value) };
       return;
     }
     if (tool === "pan") {
+      e.preventDefault();
       state.panState = { sx: e.clientX, sy: e.clientY };
       return;
     }
@@ -509,6 +563,7 @@ function bindDiagramInteractions() {
 
   window.addEventListener("mousemove", (e) => {
     if (state.drawDraft) {
+      e.preventDefault();
       const p = getScenePoint(e);
       if (!p) return;
       state.drawDraft.points.push({ x: p.x, y: p.y });
@@ -565,7 +620,7 @@ function setupEvents() {
   $("resetMappingBtn").onclick = () => { state.mapping = {}; renderMappingUI(); validateAndPreview(); };
   $("importBtn").onclick = renderDiagram;
 
-  ["units", "labelDensity", "showGrid", "showHoleId", "orientation", "printRotation", "metaShot", "metaFace", "metaInterior", "metaDiameter", "metaBench", "metaDate", "metaNotes", "showCoordTable", "annotationColor", "annotationWidth"].forEach((id) => {
+  ["units", "labelDensity", "textScale", "showGrid", "showHoleId", "orientation", "printRotation", "metaShot", "metaFace", "metaInterior", "metaDiameter", "metaBench", "metaDate", "metaNotes", "showCoordTable", "annotationColor", "annotationWidth"].forEach((id) => {
     $(id).addEventListener("change", renderDiagram);
     $(id).addEventListener("input", renderDiagram);
   });

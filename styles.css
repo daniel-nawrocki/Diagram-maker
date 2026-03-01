@@ -69,7 +69,7 @@ footer {
 .submenu-content { padding: 0 0.7rem 0.7rem; }
 .workspace {
   display: grid;
-  grid-template-rows: auto 1fr minmax(120px, 22%);
+  grid-template-rows: auto 1fr;
   min-height: 0;
   padding: 0.65rem;
   gap: 0.55rem;
@@ -158,6 +158,8 @@ dialog {
 }
 .dialog-form { padding: 0.5rem; }
 .dialog-form menu { display: flex; justify-content: flex-end; padding: 0; margin: 0.6rem 0 0; }
+.table-dialog-form { min-width: min(920px, 94vw); }
+.dialog-table-wrap { max-height: min(70vh, 560px); }
 
 .hole-popup {
   position: absolute;

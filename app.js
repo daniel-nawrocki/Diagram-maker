@@ -196,32 +196,40 @@ function renderDiagram() {
 
   const root = el("g", { transform: `translate(${state.transform.tx},${state.transform.ty}) scale(${state.transform.scale})` });
   const rotation = Number.parseInt($("printRotation").value || "0", 10) || 0;
-  const content = el("g", { transform: rotation ? `rotate(${rotation} ${W / 2} ${H / 2})` : "" });
+  const geo = el("g", { transform: rotation ? `rotate(${rotation} ${W / 2} ${H / 2})` : "" });
   if ($("showGrid").checked) {
-    content.appendChild(drawGrid(W, H, 50));
+    geo.appendChild(drawGrid(W, H, 50));
   }
 
   const placedLabels = [];
   data.forEach((d) => {
     const p = toSvg(d.x, d.y);
+    const isVertical = Math.abs(d.angle_deg) < 0.01;
     const bearingRad = (d.bearing_deg * Math.PI) / 180;
     const dx = Math.sin(bearingRad) * 24;
     const dy = -Math.cos(bearingRad) * 24;
-    content.append(el("circle", { cx: p.x, cy: p.y, r: 3, fill: "#111827" }));
-    content.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: "#374151", "stroke-width": 1.1, "marker-end": "url(#arrowHead)" }));
+    geo.append(el("circle", { cx: p.x, cy: p.y, r: 3, fill: "#111827" }));
+    if (!isVertical) {
+      geo.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: "#374151", "stroke-width": 1.1, "marker-end": "url(#arrowHead)" }));
+      const angleAnchorX = p.x + dx * 0.86 + (dx >= 0 ? 4 : -4);
+      const angleAnchorY = p.y + dy * 0.86 + (dy >= 0 ? 4 : -4);
+      geo.append(el("text", { x: angleAnchorX, y: angleAnchorY, "font-size": 9, fill: "#111827", "text-anchor": dx >= 0 ? "start" : "end" }, `${d.angle_deg.toFixed(1)}°`));
+    }
 
     const parts = labelParts(d);
-    const bbox = placeLabel(p, parts.map((part) => part.text).join(""), placedLabels);
-    if (bbox.leader) content.append(el("line", { x1: p.x, y1: p.y, x2: bbox.x, y2: bbox.y + bbox.h * 0.7, stroke: "#9ca3af", "stroke-width": 0.6 }));
-    const label = el("text", { x: bbox.x, y: bbox.y + bbox.h * 0.75, "font-size": 10 });
-    parts.forEach((part) => label.append(el("tspan", { fill: part.color }, part.text)));
-    content.append(label);
-    placedLabels.push(bbox);
+    if (parts.length) {
+      const bbox = placeLabel(p, parts.map((part) => part.text).join(""), placedLabels);
+      if (bbox.leader) geo.append(el("line", { x1: p.x, y1: p.y, x2: bbox.x, y2: bbox.y + bbox.h * 0.7, stroke: "#9ca3af", "stroke-width": 0.6 }));
+      const label = el("text", { x: bbox.x, y: bbox.y + bbox.h * 0.75, "font-size": 10 });
+      parts.forEach((part) => label.append(el("tspan", { fill: part.color }, part.text)));
+      geo.append(label);
+      placedLabels.push(bbox);
+    }
   });
 
   svg.append(el("defs", {}, el("marker", { id: "arrowHead", viewBox: "0 0 10 10", refX: "8", refY: "5", markerWidth: "5", markerHeight: "5", orient: "auto-start-reverse" }, el("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "#374151" }))));
-  content.append(drawFixedHud(W, H, spanX, scale));
-  root.append(content);
+  root.append(geo);
+  root.append(drawFixedHud(W, H, spanX, scale));
   svg.append(root);
   renderTable();
 }
@@ -236,12 +244,11 @@ function drawGrid(w, h, step) {
 function labelParts(d) {
   if (!$("showHoleId").checked && $("labelDensity").value === "minimal") return [];
   const depth = `${d.depth_ft.toFixed(1)} ft`;
-  const angle = `${d.angle_deg.toFixed(1)}°`;
   const id = d.hole_id;
   const density = $("labelDensity").value;
   if (density === "minimal") return [{ text: id, color: "#1d4ed8" }];
   if (density === "standard") return [{ text: `${id} `, color: "#1d4ed8" }, { text: depth, color: "#111827" }];
-  return [{ text: `${id} `, color: "#1d4ed8" }, { text: `${angle} / ${depth}`, color: "#111827" }];
+  return [{ text: `${id} `, color: "#1d4ed8" }, { text: `depth ${depth}`, color: "#111827" }];
 }
 
 function placeLabel(p, txt, occupied) {
@@ -351,17 +358,58 @@ async function exportPdf() {
   }
 
   const tableRows = [...$("holeTable").querySelectorAll("tr")].map((tr) => [...tr.children].map((c) => c.textContent));
-  const perPage = 36;
-  for (let i = 0; i < tableRows.length; i += perPage) {
+  const header = tableRows[0] || [];
+  const bodyRows = tableRows.slice(1);
+  const rowsPerPage = 34;
+  let idx = 0;
+
+  while (idx < bodyRows.length || idx === 0) {
     doc.addPage("letter", "p");
-    doc.setFontSize(10);
-    let y = 34;
-    tableRows.slice(i, i + perPage).forEach((row) => {
-      doc.text(row.join("   "), 20, y);
-      y += 15;
-    });
+    const pageRows = bodyRows.slice(idx, idx + rowsPerPage);
+    drawPdfTablePage(doc, header, pageRows);
+    idx += rowsPerPage;
+    if (!bodyRows.length) break;
   }
+
   doc.save("blast-hole-diagram.pdf");
+}
+
+
+function drawPdfTablePage(doc, header, rows) {
+  const pageWidth = 612;
+  const margin = 24;
+  const tableWidth = pageWidth - margin * 2;
+  const rowHeight = 16;
+  const headerY = 34;
+  const colCount = Math.max(1, header.length || (rows[0] || []).length || 1);
+  const colWidth = tableWidth / colCount;
+
+  doc.setLineWidth(0.35);
+  doc.setDrawColor(170, 180, 190);
+  doc.setFillColor(245, 248, 252);
+
+  doc.rect(margin, headerY, tableWidth, rowHeight, "FD");
+  doc.setFontSize(9);
+  doc.setTextColor(31, 41, 55);
+
+  for (let c = 0; c < colCount; c += 1) {
+    const x = margin + c * colWidth;
+    doc.line(x, headerY, x, headerY + rowHeight * (rows.length + 1));
+    const text = String(header[c] || "");
+    doc.text(text, x + 3, headerY + 11, { maxWidth: colWidth - 6 });
+  }
+  doc.line(margin + tableWidth, headerY, margin + tableWidth, headerY + rowHeight * (rows.length + 1));
+
+  rows.forEach((row, rIdx) => {
+    const y = headerY + rowHeight * (rIdx + 1);
+    doc.line(margin, y + rowHeight, margin + tableWidth, y + rowHeight);
+    for (let c = 0; c < colCount; c += 1) {
+      const cell = String(row[c] || "");
+      doc.text(cell, margin + c * colWidth + 3, y + 11, { maxWidth: colWidth - 6 });
+    }
+  });
+
+  doc.line(margin, headerY, margin + tableWidth, headerY);
 }
 
 function svgToPng(svg, width, height) {

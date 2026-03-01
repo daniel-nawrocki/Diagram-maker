@@ -5,12 +5,12 @@ const REQUIRED_BY_MODE = {
 };
 const OPTIONAL_FIELDS = ["diameter_in", "pattern_type", "notes"];
 const ANGLE_COLORS = {
-  5: "#ef4444",
-  10: "#f97316",
+  5: "#f97316",
+  10: "#22c55e",
   15: "#eab308",
-  20: "#22c55e",
-  25: "#0ea5e9",
-  30: "#8b5cf6",
+  20: "#0ea5e9",
+  25: "#8b5cf6",
+  30: "#ef4444",
 };
 
 const ALIASES = {
@@ -40,6 +40,8 @@ const state = {
   annotations: { paths: [], texts: [] },
   drawDraft: null,
   panState: null,
+  renderedPoints: [],
+  selectedHoleId: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -194,12 +196,15 @@ function renderDiagram() {
   const data = projectedRows();
   svg.innerHTML = "";
   renderTable();
-  if (!data.length) return;
+  if (!data.length) {
+    hideHolePopup();
+    return;
+  }
 
   const W = 1100;
   const H = 850;
   const margin = 70;
-  const rotation = Number.parseInt($("printRotation").value || "0", 10) || 0;
+  const rotation = normalizeRotation($("diagramRotation").value);
   const rotatedData = rotateProjectedRows(data, rotation);
   const xs = rotatedData.map((d) => d.x);
   const ys = rotatedData.map((d) => d.y);
@@ -217,16 +222,18 @@ function renderDiagram() {
   scene.append(el("defs", {}, el("marker", { id: "arrowHead", viewBox: "0 0 10 10", refX: "8", refY: "5", markerWidth: "5", markerHeight: "5", orient: "auto-start-reverse" }, el("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "#334155" }))));
   const textScale = Number($("textScale").value) || 1;
   const usedAngles = new Set();
+  state.renderedPoints = [];
   rotatedData.forEach((d) => {
-        const p = toSvg(d.x, d.y);
+    const p = toSvg(d.x, d.y);
     const isVertical = Math.abs(d.angle_deg) < 0.01;
     const bearingRad = (d.bearing_deg * Math.PI) / 180;
     const dx = Math.sin(bearingRad) * 24;
     const dy = -Math.cos(bearingRad) * 24;
-    scene.append(el("circle", { cx: p.x, cy: p.y, r: 3, fill: "#0f172a" }));
+    scene.append(el("circle", { cx: p.x, cy: p.y, r: 2.2, fill: "#0f172a" }));
+    state.renderedPoints.push({ hole_id: d.hole_id, x: p.x, y: p.y });
 
     if ($("showHoleId").checked) {
-      scene.append(el("text", { x: p.x, y: p.y - 6, "font-size": 9 * textScale, fill: "#2563eb", "text-anchor": "middle", "font-weight": 700 }, d.hole_id));
+      scene.append(el("text", { x: p.x, y: p.y - 6, "font-size": 9 * textScale, fill: "#2563eb", "text-anchor": "middle", "font-weight": 700, transform: `rotate(${rotation} ${p.x} ${p.y - 6})` }, d.hole_id));
     }
 
     if (!isVertical) {
@@ -234,21 +241,21 @@ function renderDiagram() {
       const angleColor = ANGLE_COLORS[angle] || "#475569";
       usedAngles.add(angle);
       scene.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: angleColor, "stroke-width": 1.6, "marker-end": "url(#arrowHead)" }));
-      scene.append(el("text", { x: p.x + dx + 4, y: p.y + dy + 3, "font-size": 9 * textScale, fill: angleColor, "font-weight": 700 }, `${d.angle_deg.toFixed(1)}°`));
+      scene.append(el("text", { x: p.x + dx + 4, y: p.y + dy + 3, "font-size": 9 * textScale, fill: angleColor, "font-weight": 700, transform: `rotate(${rotation} ${p.x + dx + 4} ${p.y + dy + 3})` }, `${d.angle_deg.toFixed(1)}°`));
     }
 
     const parts = labelParts(d);
     if (!parts.length) return;
     const box = placeLabel(p, parts.map((part) => part.text).join(""), placedLabels);
     if (box.leader) scene.append(el("line", { x1: p.x, y1: p.y, x2: box.x, y2: box.y + box.h * 0.7, stroke: "#94a3b8", "stroke-width": 0.6 }));
-    const label = el("text", { x: box.x, y: box.y + box.h * 0.75, "font-size": 10 * textScale });
+    const label = el("text", { x: box.x, y: box.y + box.h * 0.75, "font-size": 10 * textScale, transform: `rotate(${rotation} ${box.x} ${box.y + box.h * 0.75})` });
     parts.forEach((part) => label.append(el("tspan", { fill: part.color }, part.text)));
     scene.append(label);
     placedLabels.push(box);
   });
 
   scene.append(drawNorthArrow(W, rotation));
-  scene.append(drawAnnotations());
+  scene.append(drawAnnotations(rotation));
   root.append(scene);
   root.append(drawHud(W, H, spanX, scale, usedAngles));
   svg.append(root);
@@ -284,7 +291,7 @@ function drawNorthArrow(W, rotation) {
   return g;
 }
 
-function drawAnnotations() {
+function drawAnnotations(rotation = 0) {
   const g = el("g", { id: "annotationLayer" });
   const allPaths = [...state.annotations.paths, ...(state.drawDraft ? [state.drawDraft] : [])];
   allPaths.forEach((path) => {
@@ -293,7 +300,7 @@ function drawAnnotations() {
     g.append(el("path", { d, fill: "none", stroke: path.color, "stroke-width": path.width, "stroke-linecap": "round", "stroke-linejoin": "round", opacity: 0.9 }));
   });
   state.annotations.texts.forEach((note) => {
-    g.append(el("text", { x: note.x, y: note.y, fill: note.color, "font-size": 13, "font-weight": 600 }, note.text));
+    g.append(el("text", { x: note.x, y: note.y, fill: note.color, "font-size": 13, "font-weight": 600, transform: `rotate(${rotation} ${note.x} ${note.y})` }, note.text));
   });
   return g;
 }
@@ -378,6 +385,12 @@ function normalizeAngleValue(angleDeg) {
   return Math.round(Number(angleDeg));
 }
 
+function normalizeRotation(value) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return ((parsed % 360) + 360) % 360;
+}
+
 function chooseNiceScale(v) {
   const mags = [1, 2, 5];
   const p = Math.pow(10, Math.floor(Math.log10(Math.max(v, 1))));
@@ -437,7 +450,8 @@ async function exportPdf() {
     console.error(err);
     return alert("Could not export PDF image. Please try again.");
   }
-    const tableRows = [...$("holeTable").querySelectorAll("tr")].map((tr) => [...tr.children].map((c) => c.textContent));
+
+  const tableRows = [...$("holeTable").querySelectorAll("tr")].map((tr) => [...tr.children].map((c) => c.textContent));
   const header = tableRows[0] || [];
   const bodyRows = tableRows.slice(1);
 
@@ -603,6 +617,22 @@ function downloadBlob(contents, filename, type) {
   URL.revokeObjectURL(a.href);
 }
 
+
+function showHolePopup(holeId) {
+  const hole = state.imported.find((d) => d.hole_id === holeId);
+  if (!hole) return;
+  state.selectedHoleId = holeId;
+  $("holePopupTitle").textContent = `Hole ${holeId}`;
+  $("holePopupPattern").value = hole.pattern_type || "";
+  $("holePopupNotes").value = hole.notes || "";
+  $("holePopup").hidden = false;
+}
+
+function hideHolePopup() {
+  state.selectedHoleId = null;
+  $("holePopup").hidden = true;
+}
+
 function setupEvents() {
   const dz = $("dropZone");
   dz.addEventListener("dragover", (e) => { e.preventDefault(); dz.classList.add("dragover"); });
@@ -620,7 +650,7 @@ function setupEvents() {
   $("resetMappingBtn").onclick = () => { state.mapping = {}; renderMappingUI(); validateAndPreview(); };
   $("importBtn").onclick = renderDiagram;
 
-  ["units", "labelDensity", "textScale", "showGrid", "showHoleId", "orientation", "printRotation", "metaShot", "metaFace", "metaInterior", "metaDiameter", "metaBench", "metaDate", "metaNotes", "showCoordTable", "annotationColor", "annotationWidth"].forEach((id) => {
+  ["units", "labelDensity", "textScale", "showGrid", "showHoleId", "orientation", "diagramRotation", "metaShot", "metaFace", "metaInterior", "metaDiameter", "metaBench", "metaDate", "metaNotes", "showCoordTable", "annotationColor", "annotationWidth"].forEach((id) => {
     $(id).addEventListener("change", renderDiagram);
     $(id).addEventListener("input", renderDiagram);
   });
@@ -660,12 +690,41 @@ function setupEvents() {
     loadPresets();
   };
 
+  $("openMetadataBtn").onclick = () => $("metadataDialog").showModal();
+  $("openNotesBtn").onclick = () => $("notesDialog").showModal();
+  $("closeMetadataBtn").onclick = () => $("metadataDialog").close();
+  $("closeNotesBtn").onclick = () => $("notesDialog").close();
+  $("diagramRotation").addEventListener("change", (e) => {
+    e.target.value = String(normalizeRotation(e.target.value));
+    renderDiagram();
+  });
+
+  $("diagramSvg").addEventListener("click", (e) => {
+    if ($("annotationTool").value !== "pan") return;
+    const p = getScenePoint(e);
+    if (!p || !state.renderedPoints.length) return;
+    const nearest = state.renderedPoints
+      .map((d) => ({ ...d, dist: Math.hypot(d.x - p.x, d.y - p.y) }))
+      .sort((a, b) => a.dist - b.dist)[0];
+    if (!nearest || nearest.dist > 12) return hideHolePopup();
+    showHolePopup(nearest.hole_id);
+  });
+
+  $("holePopupSaveBtn").onclick = () => {
+    const hole = state.imported.find((d) => d.hole_id === state.selectedHoleId);
+    if (!hole) return;
+    hole.pattern_type = $("holePopupPattern").value.trim();
+    hole.notes = $("holePopupNotes").value.trim();
+    renderDiagram();
+  };
+  $("holePopupCloseBtn").onclick = hideHolePopup;
+
   bindDiagramInteractions();
 }
 
 setupEvents();
 loadPresets();
 $("orientation").value = "landscape";
-$("printRotation").value = "0";
+$("diagramRotation").value = "0";
 $("units").value = "ft";
 $("labelDensity").value = "standard";

@@ -130,3 +130,12 @@ small { color: var(--muted); }
   .app-shell { grid-template-columns: 1fr; height: auto; }
   .workspace { min-height: 70vh; }
 }
+
+
+#diagramSvg, #diagramSvg * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+#diagramSvg text {
+  pointer-events: none;
+}

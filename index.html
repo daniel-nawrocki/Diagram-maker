@@ -104,7 +104,10 @@
     <section class="workspace panel">
       <div class="workspace-head">
         <h2>Diagram Workspace</h2>
-        <button id="exportTableCsvBtn">Export Table CSV</button>
+        <div class="controls-row">
+          <button id="openTableBtn">View Table</button>
+          <button id="exportTableCsvBtn">Export Table CSV</button>
+        </div>
       </div>
       <div id="diagramWrap" class="diagram-wrap">
         <svg id="diagramSvg" viewBox="0 0 1100 850"></svg>
@@ -117,9 +120,6 @@
             <button id="holePopupCloseBtn" type="button">Close</button>
           </div>
         </div>
-      </div>
-      <div class="table-wrap">
-        <table id="holeTable"></table>
       </div>
     </section>
   </main>
@@ -151,6 +151,18 @@
       <label>Notes <textarea id="metaNotes" rows="4"></textarea></label>
       <menu>
         <button value="cancel" type="button" id="closeNotesBtn">Close</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="tableDialog">
+    <form method="dialog" class="dialog-form table-dialog-form">
+      <h3>Hole Table</h3>
+      <div class="table-wrap dialog-table-wrap">
+        <table id="holeTable"></table>
+      </div>
+      <menu>
+        <button value="cancel" type="button" id="closeTableBtn">Close</button>
       </menu>
     </form>
   </dialog>

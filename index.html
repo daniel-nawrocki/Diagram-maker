@@ -10,83 +10,111 @@
   <script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.1.3/dist/svg2pdf.umd.min.js"></script>
 </head>
 <body>
-  <header>
-    <h1>Blast Hole Diagrammer</h1>
-    <p>True-scale, print-ready blast hole diagrams from CSV.</p>
+  <header class="app-header">
+    <div>
+      <h1>Blast Hole Diagrammer</h1>
+      <p>True-scale, print-ready blast hole diagrams from CSV.</p>
+    </div>
+    <div class="header-actions">
+      <button id="fitScreenBtn">Fit Screen</button>
+      <button id="fitPageBtn">Fit Page</button>
+      <button id="exportPdfBtn">Export PDF</button>
+    </div>
   </header>
 
-  <main>
-    <section class="panel import-panel">
-      <h2>1) CSV Import & Mapping</h2>
-      <div id="dropZone" class="drop-zone">Drop CSV here or <label for="csvFile" class="inline-link">browse</label><input id="csvFile" type="file" accept=".csv,text/csv" hidden /></div>
-      <div class="controls-row">
-        <label>Coordinate Mode
-          <select id="coordMode">
-            <option value="auto">Auto</option>
-            <option value="planar">Planar (E/N)</option>
-            <option value="latlon">Lat/Lon</option>
-          </select>
-        </label>
-        <button id="autoDetectBtn">Re-run auto-detect</button>
-        <button id="resetMappingBtn">Reset mapping</button>
-      </div>
-      <div class="controls-row preset-row">
-        <input id="presetName" placeholder="Preset name" />
-        <button id="savePresetBtn">Save Preset</button>
-        <select id="presetSelect"><option value="">Load preset...</option></select>
-        <button id="deletePresetBtn">Delete Preset</button>
-      </div>
-      <div id="mappingGrid" class="mapping-grid"></div>
-      <div id="importSummary" class="summary"></div>
-      <button id="importBtn" disabled>Import Renderable Rows</button>
-      <h3>CSV Preview (first 50 rows)</h3>
-      <div class="preview-wrap"><table id="previewTable"></table></div>
-    </section>
+  <main class="app-shell">
+    <aside class="sidebar panel">
+      <details class="submenu" open>
+        <summary>Import & Mapping</summary>
+        <div class="submenu-content">
+          <div id="dropZone" class="drop-zone">Drop CSV here or <label for="csvFile" class="inline-link">browse</label><input id="csvFile" type="file" accept=".csv,text/csv" hidden /></div>
+          <div class="controls-row">
+            <label>Coordinate Mode
+              <select id="coordMode">
+                <option value="auto">Auto</option>
+                <option value="planar">Planar (E/N)</option>
+                <option value="latlon">Lat/Lon</option>
+              </select>
+            </label>
+            <button id="autoDetectBtn">Auto Detect</button>
+            <button id="resetMappingBtn">Reset</button>
+          </div>
+          <div class="controls-row">
+            <input id="presetName" placeholder="Preset name" />
+            <button id="savePresetBtn">Save</button>
+            <select id="presetSelect"><option value="">Load preset...</option></select>
+            <button id="deletePresetBtn">Delete</button>
+          </div>
+          <div id="mappingGrid" class="mapping-grid"></div>
+          <div id="importSummary" class="summary"></div>
+          <button id="importBtn" disabled>Import Renderable Rows</button>
+          <h3>CSV Preview (50 rows)</h3>
+          <div class="preview-wrap compact"><table id="previewTable"></table></div>
+        </div>
+      </details>
 
-    <section class="panel config-panel">
-      <h2>2) Diagram Settings</h2>
-      <div class="controls-grid">
-        <label>Page Size <select id="pageSize"><option value="letter">Letter (11x8.5")</option></select></label>
-        <label>Orientation <select id="orientation"><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></label>
-        <label>Print Rotation <select id="printRotation"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></label>
-        <label>Units <select id="units"><option value="ft">Feet</option><option value="m">Meters</option></select></label>
-        <label>Label Density <select id="labelDensity"><option value="minimal">Minimal (ID)</option><option value="standard" selected>Standard (ID + Depth)</option><option value="full">Full (ID + Angle + Depth)</option></select></label>
-      </div>
-      <div class="controls-row">
-        <label><input type="checkbox" id="showGrid" /> Grid</label>
-        <label><input type="checkbox" id="showHoleId" checked /> Show Hole ID</label>
-      </div>
-      <h3>Shot Metadata</h3>
-      <div class="controls-grid metadata-grid">
-        <label>Shot Number <input id="metaShot" /></label>
-        <label>Face Pattern <input id="metaFace" /></label>
-        <label>Interior Pattern <input id="metaInterior" /></label>
-        <label>Hole Diameter <input id="metaDiameter" /></label>
-        <label>Bench <input id="metaBench" /></label>
-        <label>Date <input id="metaDate" type="date" /></label>
-      </div>
-      <label>Notes <textarea id="metaNotes" rows="2"></textarea></label>
-      <div class="controls-row">
-        <button id="fitScreenBtn">Fit to Screen</button>
-        <button id="fitPageBtn">Fit to Page</button>
-        <button id="exportPdfBtn">Export PDF</button>
-      </div>
-    </section>
+      <details class="submenu" open>
+        <summary>Diagram Adjustments</summary>
+        <div class="submenu-content">
+          <div class="controls-grid">
+            <label>Page Size <select id="pageSize"><option value="letter">Letter (11x8.5")</option></select></label>
+            <label>Orientation <select id="orientation"><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></label>
+            <label>Print Rotation <select id="printRotation"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></label>
+            <label>Units <select id="units"><option value="ft">Feet</option><option value="m">Meters</option></select></label>
+            <label>Label Density <select id="labelDensity"><option value="minimal">Minimal (ID)</option><option value="standard" selected>Standard (ID + Depth)</option><option value="full">Full (ID + Angle + Depth)</option></select></label>
+          </div>
+          <div class="controls-row">
+            <label><input type="checkbox" id="showGrid" /> Grid</label>
+            <label><input type="checkbox" id="showHoleId" checked /> Show Hole ID</label>
+            <label><input type="checkbox" id="showCoordTable" checked /> Include coordinates in table</label>
+          </div>
+          <h3>Shot Metadata</h3>
+          <div class="controls-grid metadata-grid">
+            <label>Shot Number <input id="metaShot" /></label>
+            <label>Face Pattern <input id="metaFace" /></label>
+            <label>Interior Pattern <input id="metaInterior" /></label>
+            <label>Hole Diameter <input id="metaDiameter" /></label>
+            <label>Bench <input id="metaBench" /></label>
+            <label>Date <input id="metaDate" type="date" /></label>
+          </div>
+          <label>Notes <textarea id="metaNotes" rows="2"></textarea></label>
+        </div>
+      </details>
 
-    <section class="panel diagram-panel">
-      <h2>3) Diagram</h2>
+      <details class="submenu" open>
+        <summary>Markup & Notes (Prints with diagram)</summary>
+        <div class="submenu-content">
+          <div class="controls-row">
+            <label>Tool
+              <select id="annotationTool">
+                <option value="pan">Pan / Zoom</option>
+                <option value="draw">Draw</option>
+                <option value="text">Text Note</option>
+              </select>
+            </label>
+            <label>Color <input id="annotationColor" type="color" value="#38bdf8" /></label>
+            <label>Width <input id="annotationWidth" type="range" min="1" max="8" value="2" /></label>
+          </div>
+          <div class="controls-row">
+            <input id="annotationText" placeholder="Text note content" />
+            <button id="clearAnnotationsBtn">Clear Markup</button>
+          </div>
+          <small>Tip: choose Text Note, click diagram to place. Notes and draw paths are included in PDF output.</small>
+        </div>
+      </details>
+    </aside>
+
+    <section class="workspace panel">
+      <div class="workspace-head">
+        <h2>Diagram Workspace</h2>
+        <button id="exportTableCsvBtn">Export Table CSV</button>
+      </div>
       <div id="diagramWrap" class="diagram-wrap">
         <svg id="diagramSvg" viewBox="0 0 1100 850"></svg>
       </div>
-    </section>
-
-    <section class="panel table-panel">
-      <h2>4) Hole Table</h2>
-      <div class="controls-row">
-        <label><input type="checkbox" id="showCoordTable" checked /> Include coordinates</label>
-        <button id="exportTableCsvBtn">Export Table CSV</button>
+      <div class="table-wrap">
+        <table id="holeTable"></table>
       </div>
-      <div class="preview-wrap"><table id="holeTable"></table></div>
     </section>
   </main>
 

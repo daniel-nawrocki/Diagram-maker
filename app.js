@@ -271,7 +271,7 @@ function renderDiagram() {
 
   svg.append(el("defs", {}, el("marker", { id: "arrowHead", viewBox: "0 0 10 10", refX: "8", refY: "5", markerWidth: "5", markerHeight: "5", orient: "auto-start-reverse" }, el("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "#374151" }))));
   root.append(geo);
-  root.append(drawFixedHud(W, H, spanX, scale));
+  root.append(drawFixedHud(W, H, spanX, scale, rotation));
   svg.append(root);
   renderTable();
 }
@@ -310,8 +310,12 @@ function clear(b, occupied, p) {
 }
 const intersects = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
-function drawFixedHud(W, H, spanX, scalePxPerUnit) {
+function drawFixedHud(W, H, spanX, scalePxPerUnit, rotationDeg = 0) {
   const g = el("g", {});
+  const rotateText = (attrs) => {
+    if (!rotationDeg) return attrs;
+    return { ...attrs, transform: `rotate(${rotationDeg} ${attrs.x} ${attrs.y})` };
+  };
   const meta = {
     shot: $("metaShot").value,
     face: $("metaFace").value,
@@ -321,16 +325,18 @@ function drawFixedHud(W, H, spanX, scalePxPerUnit) {
     date: $("metaDate").value,
   };
 
-  g.append(el("line", { x1: W - 75, y1: 45, x2: W - 75, y2: 20, stroke: "#111827", "stroke-width": 1.5 }));
-  g.append(el("polygon", { points: `${W - 75},14 ${W - 80},24 ${W - 70},24`, fill: "#111827" }));
-  g.append(el("text", { x: W - 82, y: 58, "font-size": 11 }, "N"));
+  const northArrow = el("g", { transform: rotationDeg ? `rotate(${rotationDeg} ${W - 75} ${35})` : "" });
+  northArrow.append(el("line", { x1: W - 75, y1: 45, x2: W - 75, y2: 20, stroke: "#111827", "stroke-width": 1.5 }));
+  northArrow.append(el("polygon", { points: `${W - 75},14 ${W - 80},24 ${W - 70},24`, fill: "#111827" }));
+  northArrow.append(el("text", { x: W - 82, y: 58, "font-size": 11 }, "N"));
+  g.append(northArrow);
 
   const targetUnits = chooseNiceScale(spanX / 5);
   const px = targetUnits * scalePxPerUnit;
   g.append(el("line", { x1: 30, y1: H - 28, x2: 30 + px, y2: H - 28, stroke: "#111827", "stroke-width": 2 }));
   g.append(el("line", { x1: 30, y1: H - 34, x2: 30, y2: H - 22, stroke: "#111827", "stroke-width": 1 }));
   g.append(el("line", { x1: 30 + px, y1: H - 34, x2: 30 + px, y2: H - 22, stroke: "#111827", "stroke-width": 1 }));
-  g.append(el("text", { x: 30, y: H - 38, "font-size": 10 }, `${targetUnits.toFixed(0)} ${$("units").value}`));
+  g.append(el("text", rotateText({ x: 30, y: H - 38, "font-size": 10 }), `${targetUnits.toFixed(0)} ${$("units").value}`));
 
   const legendX = W - 300, legendY = H - 120;
   g.append(el("rect", { x: legendX, y: legendY, width: 270, height: 100, fill: "white", stroke: "#9ca3af" }));
@@ -341,7 +347,11 @@ function drawFixedHud(W, H, spanX, scalePxPerUnit) {
     `Hole Ø: ${meta.diam || "-"}`,
     `Bench: ${meta.bench || "-"}    Date: ${meta.date || "-"}`,
   ];
-  rows.forEach((t, i) => g.append(el("text", { x: legendX + 8, y: legendY + 18 + i * 16, "font-size": 11 }, t)));
+  rows.forEach((t, i) => {
+    const x = legendX + 8;
+    const y = legendY + 18 + i * 16;
+    g.append(el("text", rotateText({ x, y, "font-size": 11 }), t));
+  });
   return g;
 }
 function chooseNiceScale(v) {

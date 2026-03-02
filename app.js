@@ -13,6 +13,7 @@ const RERENDER_CONTROL_IDS = [
   "showGrid",
   "showHoleId",
   "orientation",
+  "diagramRotation",
   "printRotation",
   "metaShot",
   "metaFace",
@@ -228,7 +229,8 @@ function renderDiagram() {
   const toSvg = (x, y) => ({ x: margin + (x - minX) * scale, y: H - margin - (y - minY) * scale });
 
   const root = el("g", { transform: `translate(${state.transform.tx},${state.transform.ty}) scale(${state.transform.scale})` });
-  const rotation = Number.parseInt($("printRotation").value || "0", 10) || 0;
+  const rotationControl = $("diagramRotation") || $("printRotation");
+  const rotation = Number.parseInt(rotationControl?.value || "0", 10) || 0;
   const geo = el("g", { transform: rotation ? `rotate(${rotation} ${W / 2} ${H / 2})` : "" });
   if ($("showGrid").checked) {
     geo.appendChild(drawGrid(W, H, 50));
@@ -580,6 +582,7 @@ function escapeHtml(value) {
 setupEvents();
 loadPresets();
 $("orientation").value = "landscape";
-$("printRotation").value = "0";
+if ($("diagramRotation")) $("diagramRotation").value = "0";
+if ($("printRotation")) $("printRotation").value = "0";
 $("units").value = "ft";
 $("labelDensity").value = "standard";

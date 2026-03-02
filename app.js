@@ -13,6 +13,7 @@ const RERENDER_CONTROL_IDS = [
   "showGrid",
   "showHoleId",
   "orientation",
+  "diagramRotation",
   "printRotation",
   "metaShot",
   "metaFace",
@@ -79,6 +80,7 @@ function readCsv(file) {
       state.mapping = autoDetectMapping();
       renderMappingUI();
       validateAndPreview();
+      renderDiagram();
       loadPresets();
     },
   });
@@ -218,17 +220,20 @@ function renderDiagram() {
   const svg = $("diagramSvg");
   const data = projectedRows();
   svg.innerHTML = "";
-  if (!data.length) return;
 
   const W = 1100, H = 850, margin = 70;
   const xs = data.map((d) => d.x), ys = data.map((d) => d.y);
-  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const minX = data.length ? Math.min(...xs) : 0;
+  const maxX = data.length ? Math.max(...xs) : 100;
+  const minY = data.length ? Math.min(...ys) : 0;
+  const maxY = data.length ? Math.max(...ys) : 100;
   const spanX = Math.max(1, maxX - minX), spanY = Math.max(1, maxY - minY);
   const scale = Math.min((W - margin * 2) / spanX, (H - margin * 2) / spanY);
   const toSvg = (x, y) => ({ x: margin + (x - minX) * scale, y: H - margin - (y - minY) * scale });
 
   const root = el("g", { transform: `translate(${state.transform.tx},${state.transform.ty}) scale(${state.transform.scale})` });
-  const rotation = Number.parseInt($("printRotation").value || "0", 10) || 0;
+  const rotationControl = $("diagramRotation") || $("printRotation");
+  const rotation = Number.parseInt(rotationControl?.value || "0", 10) || 0;
   const geo = el("g", { transform: rotation ? `rotate(${rotation} ${W / 2} ${H / 2})` : "" });
   if ($("showGrid").checked) {
     geo.appendChild(drawGrid(W, H, 50));
@@ -259,6 +264,10 @@ function renderDiagram() {
       placedLabels.push(bbox);
     }
   });
+
+  if (!data.length) {
+    geo.append(el("text", { x: W / 2, y: H / 2, "text-anchor": "middle", "font-size": 18, fill: "#6b7280" }, "No renderable rows to display"));
+  }
 
   svg.append(el("defs", {}, el("marker", { id: "arrowHead", viewBox: "0 0 10 10", refX: "8", refY: "5", markerWidth: "5", markerHeight: "5", orient: "auto-start-reverse" }, el("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "#374151" }))));
   root.append(geo);
@@ -559,7 +568,29 @@ function setupEvents() {
     loadPresets();
   };
 
+  bindDialog("openMetadataBtn", "metadataDialog", "closeMetadataBtn");
+  bindDialog("openNotesBtn", "notesDialog", "closeNotesBtn");
+  bindDialog("openTableBtn", "tableDialog", "closeTableBtn");
+
   bindPanZoom();
+}
+
+function bindDialog(openBtnId, dialogId, closeBtnId) {
+  const openBtn = $(openBtnId);
+  const closeBtn = $(closeBtnId);
+  const dialog = $(dialogId);
+  if (!openBtn || !dialog) return;
+
+  openBtn.addEventListener("click", () => {
+    if (dialog.showModal) dialog.showModal();
+    else dialog.setAttribute("open", "open");
+  });
+
+  if (!closeBtn) return;
+  closeBtn.addEventListener("click", () => {
+    if (dialog.close) dialog.close();
+    else dialog.removeAttribute("open");
+  });
 }
 
 function bindRerenderEvents(element) {
@@ -580,6 +611,7 @@ function escapeHtml(value) {
 setupEvents();
 loadPresets();
 $("orientation").value = "landscape";
-$("printRotation").value = "0";
+if ($("diagramRotation")) $("diagramRotation").value = "0";
+if ($("printRotation")) $("printRotation").value = "0";
 $("units").value = "ft";
 $("labelDensity").value = "standard";

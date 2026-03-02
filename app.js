@@ -237,6 +237,10 @@ function renderDiagram() {
   const rotationTransform = rotation ? `rotate(${rotation} ${W / 2} ${H / 2})` : "";
   const geo = el("g", { transform: rotationTransform });
   const labels = el("g", { transform: rotationTransform });
+  const keepTextUpright = (attrs) => {
+    if (!rotation) return attrs;
+    return { ...attrs, transform: `rotate(${-rotation} ${attrs.x} ${attrs.y})` };
+  };
   if ($("showGrid").checked) {
     geo.appendChild(drawGrid(W, H, 50));
   }
@@ -253,14 +257,14 @@ function renderDiagram() {
       geo.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: "#374151", "stroke-width": 1.1, "marker-end": "url(#arrowHead)" }));
       const angleAnchorX = p.x + dx * 0.86 + (dx >= 0 ? 4 : -4);
       const angleAnchorY = p.y + dy * 0.86 + (dy >= 0 ? 4 : -4);
-      labels.append(el("text", { x: angleAnchorX, y: angleAnchorY, "font-size": 9, fill: "#111827", "text-anchor": dx >= 0 ? "start" : "end" }, `${d.angle_deg.toFixed(1)}°`));
+      labels.append(el("text", keepTextUpright({ x: angleAnchorX, y: angleAnchorY, "font-size": 9, fill: "#111827", "text-anchor": dx >= 0 ? "start" : "end" }), `${d.angle_deg.toFixed(1)}°`));
     }
 
     const parts = labelParts(d);
     if (parts.length) {
       const bbox = placeLabel(p, parts.map((part) => part.text).join(""), placedLabels);
       if (bbox.leader) labels.append(el("line", { x1: p.x, y1: p.y, x2: bbox.x, y2: bbox.y + bbox.h * 0.7, stroke: "#9ca3af", "stroke-width": 0.6 }));
-      const label = el("text", { x: bbox.x, y: bbox.y + bbox.h * 0.75, "font-size": 10 });
+      const label = el("text", keepTextUpright({ x: bbox.x, y: bbox.y + bbox.h * 0.75, "font-size": 10 }));
       parts.forEach((part) => label.append(el("tspan", { fill: part.color }, part.text)));
       labels.append(label);
       placedLabels.push(bbox);

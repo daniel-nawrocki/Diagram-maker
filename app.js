@@ -234,7 +234,9 @@ function renderDiagram() {
   const root = el("g", { transform: `translate(${state.transform.tx},${state.transform.ty}) scale(${state.transform.scale})` });
   const rotationControl = $("diagramRotation") || $("printRotation");
   const rotation = Number.parseInt(rotationControl?.value || "0", 10) || 0;
-  const geo = el("g", { transform: rotation ? `rotate(${rotation} ${W / 2} ${H / 2})` : "" });
+  const rotationTransform = rotation ? `rotate(${rotation} ${W / 2} ${H / 2})` : "";
+  const geo = el("g", { transform: rotationTransform });
+  const labels = el("g", { transform: rotationTransform });
   if ($("showGrid").checked) {
     geo.appendChild(drawGrid(W, H, 50));
   }
@@ -251,26 +253,27 @@ function renderDiagram() {
       geo.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: "#374151", "stroke-width": 1.1, "marker-end": "url(#arrowHead)" }));
       const angleAnchorX = p.x + dx * 0.86 + (dx >= 0 ? 4 : -4);
       const angleAnchorY = p.y + dy * 0.86 + (dy >= 0 ? 4 : -4);
-      geo.append(el("text", { x: angleAnchorX, y: angleAnchorY, "font-size": 9, fill: "#111827", "text-anchor": dx >= 0 ? "start" : "end" }, `${d.angle_deg.toFixed(1)}°`));
+      labels.append(el("text", { x: angleAnchorX, y: angleAnchorY, "font-size": 9, fill: "#111827", "text-anchor": dx >= 0 ? "start" : "end" }, `${d.angle_deg.toFixed(1)}°`));
     }
 
     const parts = labelParts(d);
     if (parts.length) {
       const bbox = placeLabel(p, parts.map((part) => part.text).join(""), placedLabels);
-      if (bbox.leader) geo.append(el("line", { x1: p.x, y1: p.y, x2: bbox.x, y2: bbox.y + bbox.h * 0.7, stroke: "#9ca3af", "stroke-width": 0.6 }));
+      if (bbox.leader) labels.append(el("line", { x1: p.x, y1: p.y, x2: bbox.x, y2: bbox.y + bbox.h * 0.7, stroke: "#9ca3af", "stroke-width": 0.6 }));
       const label = el("text", { x: bbox.x, y: bbox.y + bbox.h * 0.75, "font-size": 10 });
       parts.forEach((part) => label.append(el("tspan", { fill: part.color }, part.text)));
-      geo.append(label);
+      labels.append(label);
       placedLabels.push(bbox);
     }
   });
 
   if (!data.length) {
-    geo.append(el("text", { x: W / 2, y: H / 2, "text-anchor": "middle", "font-size": 18, fill: "#6b7280" }, "No renderable rows to display"));
+    labels.append(el("text", { x: W / 2, y: H / 2, "text-anchor": "middle", "font-size": 18, fill: "#6b7280" }, "No renderable rows to display"));
   }
 
   svg.append(el("defs", {}, el("marker", { id: "arrowHead", viewBox: "0 0 10 10", refX: "8", refY: "5", markerWidth: "5", markerHeight: "5", orient: "auto-start-reverse" }, el("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "#374151" }))));
   root.append(geo);
+  root.append(labels);
   root.append(drawFixedHud(W, H, spanX, scale, rotation));
   svg.append(root);
   renderTable();

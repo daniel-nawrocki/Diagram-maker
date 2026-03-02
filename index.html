@@ -60,7 +60,6 @@
             <label>Page Size <select id="pageSize"><option value="letter">Letter (11x8.5")</option></select></label>
             <label>Orientation <select id="orientation"><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></label>
             <label>Units <select id="units"><option value="ft">Feet</option><option value="m">Meters</option></select></label>
-            <label>Label Density <select id="labelDensity"><option value="minimal">Minimal (ID)</option><option value="standard" selected>Standard (ID + Depth)</option><option value="full">Full (ID + Angle + Depth)</option></select></label>
             <label>Diagram Scale
               <select id="diagramScale">
                 <option value="auto" selected>Auto (maximize to page)</option>
@@ -80,6 +79,9 @@
           <div class="controls-row icon-tools">
             <button id="openMetadataBtn" class="icon-btn" title="Edit shot metadata" aria-label="Edit shot metadata">🧾 Metadata</button>
             <button id="openNotesBtn" class="icon-btn" title="Edit notes" aria-label="Edit notes">📝 Notes</button>
+            <button id="textSizeDownBtn" class="icon-btn" title="Decrease callout text size" aria-label="Decrease callout text size">A−</button>
+            <span id="textSizeValue" aria-live="polite">Text 10px</span>
+            <button id="textSizeUpBtn" class="icon-btn" title="Increase callout text size" aria-label="Increase callout text size">A+</button>
           </div>
         </div>
       </details>

@@ -15,9 +15,10 @@ const ANGLE_COLORS = {
   30: "#3b82f6",
 };
 const PRESET_STORAGE_KEY = "blastHoleMappingPresets";
+const LABEL_FONT_MIN = 8;
+const LABEL_FONT_MAX = 18;
 const RERENDER_CONTROL_IDS = [
   "units",
-  "labelDensity",
   "showGrid",
   "showHoleId",
   "orientation",
@@ -58,6 +59,7 @@ const state = {
   errors: [],
   transform: { scale: 1, tx: 0, ty: 0 },
   sort: { key: "hole_id", dir: 1 },
+  labelFontSize: 10,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -270,6 +272,8 @@ function renderDiagram() {
   }
 
   const placedLabels = [];
+  const baseFont = state.labelFontSize;
+  const lineHeight = baseFont + 4;
   data.forEach((d) => {
     const p = toSvg(d.x, d.y);
     const isVertical = Math.abs(d.angle_deg) < 0.01;
@@ -285,33 +289,13 @@ function renderDiagram() {
     const labelInfo = labelParts(d);
     if (labelInfo.lines.length) {
       const maxLen = Math.max(...labelInfo.lines.map((line) => line.text.length));
-      const bbox = placeLabel(p, maxLen, labelInfo.lines.length, placedLabels);
-      const laneHeight = bbox.h / labelInfo.lines.length;
+      const bbox = placeLabel(p, maxLen, labelInfo.lines.length, placedLabels, baseFont);
       labels.append(el("line", { x1: p.x, y1: p.y, x2: bbox.x, y2: bbox.y + bbox.h / 2, stroke: "#9ca3af", "stroke-width": 0.8 }));
-      labels.append(el("rect", {
-        x: bbox.x,
-        y: bbox.y,
-        width: bbox.w,
-        height: bbox.h,
-        fill: "#ffffff",
-        stroke: "#94a3b8",
-        "stroke-width": 0.9,
-        rx: 2,
-      }));
-      labels.append(el("line", {
-        x1: bbox.x,
-        y1: bbox.y + laneHeight,
-        x2: bbox.x + bbox.w,
-        y2: bbox.y + laneHeight,
-        stroke: "#cbd5e1",
-        "stroke-width": 0.9,
-      }));
-      const baseFont = 10;
-      const label = el("text", keepTextUpright({ x: bbox.x + 5, y: bbox.y + laneHeight / 2 + 4, "font-size": baseFont }));
+      const label = el("text", keepTextUpright({ x: bbox.x, y: bbox.y + baseFont, "font-size": baseFont }));
       labelInfo.lines.forEach((line, idx) => {
         label.append(el("tspan", {
-          x: bbox.x + 5,
-          dy: idx === 0 ? 0 : laneHeight,
+          x: bbox.x,
+          dy: idx === 0 ? 0 : lineHeight,
           fill: line.color,
           "font-weight": line.bold ? "700" : "400",
           "text-anchor": "start",
@@ -403,9 +387,9 @@ function getAngleColor(angleDeg) {
   return ANGLE_COLORS[normalizeAngleValue(angleDeg)] || "#374151";
 }
 
-function placeLabel(p, longestLineLength, lineCount, occupied) {
-  const w = Math.max(62, longestLineLength * 7.4 + 14);
-  const h = Math.max(34, lineCount * 16);
+function placeLabel(p, longestLineLength, lineCount, occupied, fontSize = 10) {
+  const w = Math.max(50, longestLineLength * (fontSize * 0.72));
+  const h = Math.max(fontSize + 4, lineCount * (fontSize + 4));
   const offsets = [[12,-20],[-w-12,-20],[12,12],[-w-12,12],[16,-6],[-w-16,-6],[-w/2,-24],[-w/2,14]];
   for (const [ox, oy] of offsets) {
     const b = { x: p.x + ox, y: p.y + oy, w, h };
@@ -717,7 +701,22 @@ function setupEvents() {
   bindDialog("openNotesBtn", "notesDialog", "closeNotesBtn");
   bindDialog("openTableBtn", "tableDialog", "closeTableBtn");
 
+  $("textSizeUpBtn").onclick = () => adjustTextSize(1);
+  $("textSizeDownBtn").onclick = () => adjustTextSize(-1);
+
   bindPanZoom();
+}
+
+function adjustTextSize(delta) {
+  state.labelFontSize = Math.max(LABEL_FONT_MIN, Math.min(LABEL_FONT_MAX, state.labelFontSize + delta));
+  updateTextSizeUi();
+  renderDiagram();
+}
+
+function updateTextSizeUi() {
+  const label = $("textSizeValue");
+  if (!label) return;
+  label.textContent = `Text ${state.labelFontSize}px`;
 }
 
 function bindDialog(openBtnId, dialogId, closeBtnId) {
@@ -759,5 +758,5 @@ $("orientation").value = "landscape";
 if ($("diagramRotation")) $("diagramRotation").value = "0";
 if ($("printRotation")) $("printRotation").value = "0";
 $("units").value = "ft";
-$("labelDensity").value = "standard";
 if ($("diagramScale")) $("diagramScale").value = "auto";
+updateTextSizeUi();

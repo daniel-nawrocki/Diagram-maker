@@ -61,7 +61,16 @@
             <label>Orientation <select id="orientation"><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></label>
             <label>Units <select id="units"><option value="ft">Feet</option><option value="m">Meters</option></select></label>
             <label>Label Density <select id="labelDensity"><option value="minimal">Minimal (ID)</option><option value="standard" selected>Standard (ID + Depth)</option><option value="full">Full (ID + Angle + Depth)</option></select></label>
-            <label>Text Scale <input id="textScale" type="range" min="0.7" max="2" step="0.1" value="1" /></label>
+            <label>Diagram Scale
+              <select id="diagramScale">
+                <option value="auto" selected>Auto (maximize to page)</option>
+                <option value="0.75">75%</option>
+                <option value="0.9">90%</option>
+                <option value="1">100%</option>
+                <option value="1.1">110%</option>
+                <option value="1.25">125%</option>
+              </select>
+            </label>
           </div>
           <div class="controls-row">
             <label><input type="checkbox" id="showGrid" /> Grid</label>

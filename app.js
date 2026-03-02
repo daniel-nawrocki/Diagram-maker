@@ -23,6 +23,7 @@ const RERENDER_CONTROL_IDS = [
   "metaDate",
   "metaNotes",
   "showCoordTable",
+  "diagramScale",
 ];
 
 const ALIASES = {
@@ -189,6 +190,14 @@ function renderPreviewTable(invalidCells) {
   table.innerHTML = h + `<tbody>${b}</tbody>`;
 }
 
+function resolveDiagramScale(autoScale) {
+  const mode = $("diagramScale")?.value || "auto";
+  if (mode === "auto") return autoScale;
+  const factor = Number.parseFloat(mode);
+  if (!Number.isFinite(factor) || factor <= 0) return autoScale;
+  return autoScale * factor;
+}
+
 function projectedRows() {
   if (!state.imported.length) return [];
   const mode = effectiveMode();
@@ -228,8 +237,14 @@ function renderDiagram() {
   const minY = data.length ? Math.min(...ys) : 0;
   const maxY = data.length ? Math.max(...ys) : 100;
   const spanX = Math.max(1, maxX - minX), spanY = Math.max(1, maxY - minY);
-  const scale = Math.min((W - margin * 2) / spanX, (H - margin * 2) / spanY);
-  const toSvg = (x, y) => ({ x: margin + (x - minX) * scale, y: H - margin - (y - minY) * scale });
+  const autoScale = Math.min((W - margin * 2) / spanX, (H - margin * 2) / spanY);
+  const scale = resolveDiagramScale(autoScale);
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+  const toSvg = (x, y) => ({
+    x: W / 2 + (x - centerX) * scale,
+    y: H / 2 - (y - centerY) * scale,
+  });
 
   const root = el("g", { transform: `translate(${state.transform.tx},${state.transform.ty}) scale(${state.transform.scale})` });
   const rotationControl = $("diagramRotation") || $("printRotation");
@@ -260,12 +275,23 @@ function renderDiagram() {
       labels.append(el("text", keepTextUpright({ x: angleAnchorX, y: angleAnchorY, "font-size": 9, fill: "#111827", "text-anchor": dx >= 0 ? "start" : "end" }), `${d.angle_deg.toFixed(1)}°`));
     }
 
-    const parts = labelParts(d);
-    if (parts.length) {
-      const bbox = placeLabel(p, parts.map((part) => part.text).join(""), placedLabels);
+    const labelInfo = labelParts(d);
+    if (labelInfo.lines.length) {
+      const maxLen = Math.max(...labelInfo.lines.map((line) => line.text.length));
+      const bbox = placeLabel(p, maxLen, labelInfo.lines.length, placedLabels);
       if (bbox.leader) labels.append(el("line", { x1: p.x, y1: p.y, x2: bbox.x, y2: bbox.y + bbox.h * 0.7, stroke: "#9ca3af", "stroke-width": 0.6 }));
-      const label = el("text", keepTextUpright({ x: bbox.x, y: bbox.y + bbox.h * 0.75, "font-size": 10 }));
-      parts.forEach((part) => label.append(el("tspan", { fill: part.color }, part.text)));
+      const baseFont = 10;
+      const rowHeight = 14;
+      const label = el("text", keepTextUpright({ x: bbox.x, y: bbox.y + rowHeight, "font-size": baseFont }));
+      labelInfo.lines.forEach((line, idx) => {
+        label.append(el("tspan", {
+          x: bbox.x,
+          dy: idx === 0 ? 0 : rowHeight,
+          fill: line.color,
+          "font-weight": line.bold ? "700" : "400",
+          "text-anchor": "start",
+        }, line.text));
+      });
       labels.append(label);
       placedLabels.push(bbox);
     }
@@ -291,17 +317,36 @@ function drawGrid(w, h, step) {
 }
 
 function labelParts(d) {
-  if (!$("showHoleId").checked && $("labelDensity").value === "minimal") return [];
+  if (!$("showHoleId").checked && $("labelDensity").value === "minimal") return { lines: [] };
   const depth = `${d.depth_ft.toFixed(1)} ft`;
   const id = d.hole_id;
   const density = $("labelDensity").value;
-  if (density === "minimal") return [{ text: id, color: "#1d4ed8" }];
-  if (density === "standard") return [{ text: `${id} `, color: "#1d4ed8" }, { text: depth, color: "#111827" }];
-  return [{ text: `${id} `, color: "#1d4ed8" }, { text: `depth ${depth}`, color: "#111827" }];
+
+  if (density === "minimal") {
+    return { lines: [{ text: id, color: "#1d4ed8", bold: true }] };
+  }
+
+  if (density === "standard") {
+    return {
+      lines: [
+        { text: depth, color: "#111827", bold: false },
+        { text: id, color: "#1d4ed8", bold: true },
+      ],
+    };
+  }
+
+  return {
+    lines: [
+      { text: depth, color: "#111827", bold: false },
+      { text: id, color: "#1d4ed8", bold: true },
+      { text: `${d.angle_deg.toFixed(1)}°`, color: "#111827", bold: false },
+    ],
+  };
 }
 
-function placeLabel(p, txt, occupied) {
-  const w = Math.max(18, txt.length * 6.5), h = 12;
+function placeLabel(p, longestLineLength, lineCount, occupied) {
+  const w = Math.max(26, longestLineLength * 6.8 + 8);
+  const h = Math.max(16, lineCount * 14 + 4);
   const offsets = [[8,-16],[-w-8,-16],[8,8],[-w-8,8],[10,-4],[-w-10,-4],[-w/2,-18],[-w/2,10]];
   for (const [ox, oy] of offsets) {
     const b = { x: p.x + ox, y: p.y + oy, w, h, leader: false };
@@ -319,10 +364,6 @@ const intersects = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b
 
 function drawFixedHud(W, H, spanX, scalePxPerUnit, rotationDeg = 0) {
   const g = el("g", {});
-  const rotateText = (attrs) => {
-    if (!rotationDeg) return attrs;
-    return { ...attrs, transform: `rotate(${rotationDeg} ${attrs.x} ${attrs.y})` };
-  };
   const meta = {
     shot: $("metaShot").value,
     face: $("metaFace").value,
@@ -343,7 +384,7 @@ function drawFixedHud(W, H, spanX, scalePxPerUnit, rotationDeg = 0) {
   g.append(el("line", { x1: 30, y1: H - 28, x2: 30 + px, y2: H - 28, stroke: "#111827", "stroke-width": 2 }));
   g.append(el("line", { x1: 30, y1: H - 34, x2: 30, y2: H - 22, stroke: "#111827", "stroke-width": 1 }));
   g.append(el("line", { x1: 30 + px, y1: H - 34, x2: 30 + px, y2: H - 22, stroke: "#111827", "stroke-width": 1 }));
-  g.append(el("text", rotateText({ x: 30, y: H - 38, "font-size": 10 }), `${targetUnits.toFixed(0)} ${$("units").value}`));
+  g.append(el("text", { x: 30, y: H - 38, "font-size": 10 }, `${targetUnits.toFixed(0)} ${$("units").value}`));
 
   const legendX = W - 300, legendY = H - 120;
   g.append(el("rect", { x: legendX, y: legendY, width: 270, height: 100, fill: "white", stroke: "#9ca3af" }));
@@ -357,7 +398,7 @@ function drawFixedHud(W, H, spanX, scalePxPerUnit, rotationDeg = 0) {
   rows.forEach((t, i) => {
     const x = legendX + 8;
     const y = legendY + 18 + i * 16;
-    g.append(el("text", rotateText({ x, y, "font-size": 11 }), t));
+    g.append(el("text", { x, y, "font-size": 11 }, t));
   });
   return g;
 }
@@ -559,7 +600,7 @@ function setupEvents() {
   RERENDER_CONTROL_IDS.forEach((id) => bindRerenderEvents($(id)));
 
   $("fitScreenBtn").onclick = () => { state.transform = { scale: 1, tx: 0, ty: 0 }; renderDiagram(); };
-  $("fitPageBtn").onclick = () => { state.transform = { scale: $("orientation").value === "landscape" ? 1 : 0.78, tx: 0, ty: 0 }; renderDiagram(); };
+  $("fitPageBtn").onclick = () => { $("diagramScale").value = "auto"; state.transform = { scale: 1, tx: 0, ty: 0 }; renderDiagram(); };
   $("exportPdfBtn").onclick = exportPdf;
   $("exportTableCsvBtn").onclick = exportTableCsv;
 
@@ -632,3 +673,4 @@ if ($("diagramRotation")) $("diagramRotation").value = "0";
 if ($("printRotation")) $("printRotation").value = "0";
 $("units").value = "ft";
 $("labelDensity").value = "standard";
+if ($("diagramScale")) $("diagramScale").value = "auto";

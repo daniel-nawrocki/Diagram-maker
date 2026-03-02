@@ -6,6 +6,14 @@ const REQUIRED_BY_MODE = {
 const OPTIONAL_FIELDS = ["diameter_in", "pattern_type", "notes"];
 const ALL_FIELDS = [...REQUIRED_BASE, ...REQUIRED_BY_MODE.planar, ...REQUIRED_BY_MODE.latlon, ...OPTIONAL_FIELDS];
 const NUMERIC_FIELDS = new Set(["bearing_deg", "angle_deg", "depth_ft", "easting", "northing", "lat", "lon"]);
+const ANGLE_COLORS = {
+  5: "#ef4444",
+  10: "#f97316",
+  15: "#eab308",
+  20: "#22c55e",
+  25: "#0ea5e9",
+  30: "#8b5cf6",
+};
 const PRESET_STORAGE_KEY = "blastHoleMappingPresets";
 const RERENDER_CONTROL_IDS = [
   "units",
@@ -264,15 +272,16 @@ function renderDiagram() {
   data.forEach((d) => {
     const p = toSvg(d.x, d.y);
     const isVertical = Math.abs(d.angle_deg) < 0.01;
+    const angleColor = getAngleColor(d.angle_deg);
     const bearingRad = (d.bearing_deg * Math.PI) / 180;
     const dx = Math.sin(bearingRad) * 24;
     const dy = -Math.cos(bearingRad) * 24;
     geo.append(el("circle", { cx: p.x, cy: p.y, r: 3, fill: "#111827" }));
     if (!isVertical) {
-      geo.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: "#374151", "stroke-width": 1.1, "marker-end": "url(#arrowHead)" }));
+      geo.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: angleColor, "stroke-width": 1.1, "marker-end": "url(#arrowHead)" }));
       const angleAnchorX = p.x + dx * 0.86 + (dx >= 0 ? 4 : -4);
       const angleAnchorY = p.y + dy * 0.86 + (dy >= 0 ? 4 : -4);
-      labels.append(el("text", keepTextUpright({ x: angleAnchorX, y: angleAnchorY, "font-size": 9, fill: "#111827", "text-anchor": dx >= 0 ? "start" : "end" }), `${d.angle_deg.toFixed(1)}°`));
+      labels.append(el("text", keepTextUpright({ x: angleAnchorX, y: angleAnchorY, "font-size": 9, fill: angleColor, "text-anchor": dx >= 0 ? "start" : "end" }), `${d.angle_deg.toFixed(1)}°`));
     }
 
     const labelInfo = labelParts(d);
@@ -339,9 +348,17 @@ function labelParts(d) {
     lines: [
       { text: depth, color: "#111827", bold: false },
       { text: id, color: "#1d4ed8", bold: true },
-      { text: `${d.angle_deg.toFixed(1)}°`, color: "#111827", bold: false },
+      { text: `${d.angle_deg.toFixed(1)}°`, color: getAngleColor(d.angle_deg), bold: false },
     ],
   };
+}
+
+function normalizeAngleValue(angleDeg) {
+  return Math.round(Number(angleDeg));
+}
+
+function getAngleColor(angleDeg) {
+  return ANGLE_COLORS[normalizeAngleValue(angleDeg)] || "#374151";
 }
 
 function placeLabel(p, longestLineLength, lineCount, occupied) {

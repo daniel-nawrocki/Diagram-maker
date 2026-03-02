@@ -7,12 +7,12 @@ const OPTIONAL_FIELDS = ["diameter_in", "pattern_type", "notes"];
 const ALL_FIELDS = [...REQUIRED_BASE, ...REQUIRED_BY_MODE.planar, ...REQUIRED_BY_MODE.latlon, ...OPTIONAL_FIELDS];
 const NUMERIC_FIELDS = new Set(["bearing_deg", "angle_deg", "depth_ft", "easting", "northing", "lat", "lon"]);
 const ANGLE_COLORS = {
-  5: "#ef4444",
-  10: "#f97316",
-  15: "#eab308",
-  20: "#22c55e",
-  25: "#0ea5e9",
-  30: "#8b5cf6",
+  5: "#f97316",
+  10: "#22c55e",
+  15: "#0ea5e9",
+  20: "#3b82f6",
+  25: "#8b5cf6",
+  30: "#ef4444",
 };
 const PRESET_STORAGE_KEY = "blastHoleMappingPresets";
 const RERENDER_CONTROL_IDS = [
@@ -260,6 +260,7 @@ function renderDiagram() {
   const rotationTransform = rotation ? `rotate(${rotation} ${W / 2} ${H / 2})` : "";
   const geo = el("g", { transform: rotationTransform });
   const labels = el("g", { transform: rotationTransform });
+  geo.append(drawPrintAreaOutline(W, H));
   const keepTextUpright = (attrs) => {
     if (!rotation) return attrs;
     return { ...attrs, transform: `rotate(${-rotation} ${attrs.x} ${attrs.y})` };
@@ -322,6 +323,47 @@ function drawGrid(w, h, step) {
   const g = el("g", { stroke: "#eef2f7", "stroke-width": 1 });
   for (let x = 0; x <= w; x += step) g.append(el("line", { x1: x, y1: 0, x2: x, y2: h }));
   for (let y = 0; y <= h; y += step) g.append(el("line", { x1: 0, y1: y, x2: w, y2: y }));
+  return g;
+}
+
+function drawPrintAreaOutline(W, H) {
+  const orient = $("orientation")?.value === "portrait" ? "portrait" : "landscape";
+  const pageWidth = orient === "portrait" ? 612 : 792;
+  const pageHeight = orient === "portrait" ? 792 : 612;
+  const printMargin = 20;
+  const printableWidth = pageWidth - printMargin * 2;
+  const printableHeight = pageHeight - printMargin * 2;
+  const printableRatio = printableWidth / printableHeight;
+
+  const outerPadding = 28;
+  const maxWidth = W - outerPadding * 2;
+  const maxHeight = H - outerPadding * 2;
+  let boxWidth = maxWidth;
+  let boxHeight = boxWidth / printableRatio;
+  if (boxHeight > maxHeight) {
+    boxHeight = maxHeight;
+    boxWidth = boxHeight * printableRatio;
+  }
+
+  const x = (W - boxWidth) / 2;
+  const y = (H - boxHeight) / 2;
+  const g = el("g", {});
+  g.append(el("rect", {
+    x,
+    y,
+    width: boxWidth,
+    height: boxHeight,
+    fill: "none",
+    stroke: "#94a3b8",
+    "stroke-width": 1,
+    "stroke-dasharray": "8 6",
+  }));
+  g.append(el("text", {
+    x: x + 8,
+    y: y - 6,
+    "font-size": 10,
+    fill: "#64748b",
+  }, `${orient === "portrait" ? "Portrait" : "Landscape"} printable area`));
   return g;
 }
 
@@ -421,6 +463,28 @@ function drawFixedHud(W, H, spanX, scalePxPerUnit, rotationDeg = 0) {
     const x = legendX + 8;
     const y = legendY + 18 + i * 16;
     g.append(el("text", { x, y, "font-size": 11 }, t));
+  });
+
+  const colorScaleX = W - 300;
+  const colorScaleY = H - 250;
+  const colorScaleRows = Object.keys(ANGLE_COLORS)
+    .map((k) => Number.parseInt(k, 10))
+    .sort((a, b) => a - b);
+  const colorScaleHeight = 28 + colorScaleRows.length * 16;
+  g.append(el("rect", {
+    x: colorScaleX,
+    y: colorScaleY,
+    width: 270,
+    height: colorScaleHeight,
+    fill: "white",
+    stroke: "#9ca3af",
+  }));
+  g.append(el("text", { x: colorScaleX + 8, y: colorScaleY + 16, "font-size": 11, "font-weight": "700" }, "Angle color scale"));
+  colorScaleRows.forEach((angle, idx) => {
+    const y = colorScaleY + 30 + idx * 16;
+    const color = ANGLE_COLORS[angle];
+    g.append(el("line", { x1: colorScaleX + 10, y1: y - 4, x2: colorScaleX + 34, y2: y - 4, stroke: color, "stroke-width": 3 }));
+    g.append(el("text", { x: colorScaleX + 40, y: y, "font-size": 10, fill: "#111827" }, `${angle}°`));
   });
   return g;
 }

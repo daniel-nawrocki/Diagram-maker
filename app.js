@@ -304,8 +304,8 @@ function renderDiagram() {
   svg.append(el("defs", {}, el("marker", { id: "arrowHead", viewBox: "0 0 10 10", refX: "8", refY: "5", markerWidth: "5", markerHeight: "5", orient: "auto-start-reverse" }, el("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "#374151" }))));
   root.append(geo);
   root.append(labels);
-  root.append(drawFixedHud(W, H, spanX, scale, rotation));
   svg.append(root);
+  svg.append(drawFixedHud(W, H, spanX, scale, rotation));
   renderTable();
 }
 
@@ -381,17 +381,22 @@ function drawFixedHud(W, H, spanX, scalePxPerUnit, rotationDeg = 0) {
 
   const targetUnits = chooseNiceScale(spanX / 5);
   const px = targetUnits * scalePxPerUnit;
+  const diagramScaleMode = $("diagramScale")?.value || "auto";
+  const scaleLabel = diagramScaleMode === "auto"
+    ? "Auto"
+    : `${Math.round(Number.parseFloat(diagramScaleMode) * 100)}%`;
   g.append(el("line", { x1: 30, y1: H - 28, x2: 30 + px, y2: H - 28, stroke: "#111827", "stroke-width": 2 }));
   g.append(el("line", { x1: 30, y1: H - 34, x2: 30, y2: H - 22, stroke: "#111827", "stroke-width": 1 }));
   g.append(el("line", { x1: 30 + px, y1: H - 34, x2: 30 + px, y2: H - 22, stroke: "#111827", "stroke-width": 1 }));
   g.append(el("text", { x: 30, y: H - 38, "font-size": 10 }, `${targetUnits.toFixed(0)} ${$("units").value}`));
 
   const legendX = W - 300, legendY = H - 120;
-  g.append(el("rect", { x: legendX, y: legendY, width: 270, height: 100, fill: "white", stroke: "#9ca3af" }));
+  g.append(el("rect", { x: legendX, y: legendY, width: 270, height: 116, fill: "white", stroke: "#9ca3af" }));
   const rows = [
     `Shot: ${meta.shot || "-"}`,
     `Face: ${meta.face || "-"}`,
     `Interior: ${meta.interior || "-"}`,
+    `Scale: ${scaleLabel}`,
     `Hole Ø: ${meta.diam || "-"}`,
     `Bench: ${meta.bench || "-"}    Date: ${meta.date || "-"}`,
   ];

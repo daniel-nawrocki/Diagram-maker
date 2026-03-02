@@ -9,10 +9,10 @@ const NUMERIC_FIELDS = new Set(["bearing_deg", "angle_deg", "depth_ft", "easting
 const ANGLE_COLORS = {
   5: "#f97316",
   10: "#22c55e",
-  15: "#0ea5e9",
-  20: "#3b82f6",
-  25: "#8b5cf6",
-  30: "#ef4444",
+  15: "#eab308",
+  20: "#ef4444",
+  25: "#ec4899",
+  30: "#3b82f6",
 };
 const PRESET_STORAGE_KEY = "blastHoleMappingPresets";
 const RERENDER_CONTROL_IDS = [
@@ -260,7 +260,7 @@ function renderDiagram() {
   const rotationTransform = rotation ? `rotate(${rotation} ${W / 2} ${H / 2})` : "";
   const geo = el("g", { transform: rotationTransform });
   const labels = el("g", { transform: rotationTransform });
-  geo.append(drawPrintAreaOutline(W, H));
+  root.append(drawPrintAreaOutline(W, H));
   const keepTextUpright = (attrs) => {
     if (!rotation) return attrs;
     return { ...attrs, transform: `rotate(${-rotation} ${attrs.x} ${attrs.y})` };
@@ -280,23 +280,38 @@ function renderDiagram() {
     geo.append(el("circle", { cx: p.x, cy: p.y, r: 3, fill: "#111827" }));
     if (!isVertical) {
       geo.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: angleColor, "stroke-width": 1.1, "marker-end": "url(#arrowHead)" }));
-      const angleAnchorX = p.x + dx * 0.86 + (dx >= 0 ? 4 : -4);
-      const angleAnchorY = p.y + dy * 0.86 + (dy >= 0 ? 4 : -4);
-      labels.append(el("text", keepTextUpright({ x: angleAnchorX, y: angleAnchorY, "font-size": 9, fill: angleColor, "text-anchor": dx >= 0 ? "start" : "end" }), `${d.angle_deg.toFixed(1)}°`));
     }
 
     const labelInfo = labelParts(d);
     if (labelInfo.lines.length) {
       const maxLen = Math.max(...labelInfo.lines.map((line) => line.text.length));
       const bbox = placeLabel(p, maxLen, labelInfo.lines.length, placedLabels);
-      if (bbox.leader) labels.append(el("line", { x1: p.x, y1: p.y, x2: bbox.x, y2: bbox.y + bbox.h * 0.7, stroke: "#9ca3af", "stroke-width": 0.6 }));
+      const laneHeight = bbox.h / labelInfo.lines.length;
+      labels.append(el("line", { x1: p.x, y1: p.y, x2: bbox.x, y2: bbox.y + bbox.h / 2, stroke: "#9ca3af", "stroke-width": 0.8 }));
+      labels.append(el("rect", {
+        x: bbox.x,
+        y: bbox.y,
+        width: bbox.w,
+        height: bbox.h,
+        fill: "#ffffff",
+        stroke: "#94a3b8",
+        "stroke-width": 0.9,
+        rx: 2,
+      }));
+      labels.append(el("line", {
+        x1: bbox.x,
+        y1: bbox.y + laneHeight,
+        x2: bbox.x + bbox.w,
+        y2: bbox.y + laneHeight,
+        stroke: "#cbd5e1",
+        "stroke-width": 0.9,
+      }));
       const baseFont = 10;
-      const rowHeight = 14;
-      const label = el("text", keepTextUpright({ x: bbox.x, y: bbox.y + rowHeight, "font-size": baseFont }));
+      const label = el("text", keepTextUpright({ x: bbox.x + 5, y: bbox.y + laneHeight / 2 + 4, "font-size": baseFont }));
       labelInfo.lines.forEach((line, idx) => {
         label.append(el("tspan", {
-          x: bbox.x,
-          dy: idx === 0 ? 0 : rowHeight,
+          x: bbox.x + 5,
+          dy: idx === 0 ? 0 : laneHeight,
           fill: line.color,
           "font-weight": line.bold ? "700" : "400",
           "text-anchor": "start",
@@ -348,6 +363,7 @@ function drawPrintAreaOutline(W, H) {
   const x = (W - boxWidth) / 2;
   const y = (H - boxHeight) / 2;
   const g = el("g", {});
+  g.setAttribute("data-print-outline", "true");
   g.append(el("rect", {
     x,
     y,
@@ -368,29 +384,13 @@ function drawPrintAreaOutline(W, H) {
 }
 
 function labelParts(d) {
-  if (!$("showHoleId").checked && $("labelDensity").value === "minimal") return { lines: [] };
-  const depth = `${d.depth_ft.toFixed(1)} ft`;
+  if (!$("showHoleId").checked) return { lines: [] };
+  const depth = `${Math.round(d.depth_ft)} ft`;
   const id = d.hole_id;
-  const density = $("labelDensity").value;
-
-  if (density === "minimal") {
-    return { lines: [{ text: id, color: "#1d4ed8", bold: true }] };
-  }
-
-  if (density === "standard") {
-    return {
-      lines: [
-        { text: depth, color: "#111827", bold: false },
-        { text: id, color: "#1d4ed8", bold: true },
-      ],
-    };
-  }
-
   return {
     lines: [
-      { text: depth, color: "#111827", bold: false },
       { text: id, color: "#1d4ed8", bold: true },
-      { text: `${d.angle_deg.toFixed(1)}°`, color: getAngleColor(d.angle_deg), bold: false },
+      { text: depth, color: "#111827", bold: false },
     ],
   };
 }
@@ -404,14 +404,14 @@ function getAngleColor(angleDeg) {
 }
 
 function placeLabel(p, longestLineLength, lineCount, occupied) {
-  const w = Math.max(26, longestLineLength * 6.8 + 8);
-  const h = Math.max(16, lineCount * 14 + 4);
-  const offsets = [[8,-16],[-w-8,-16],[8,8],[-w-8,8],[10,-4],[-w-10,-4],[-w/2,-18],[-w/2,10]];
+  const w = Math.max(62, longestLineLength * 7.4 + 14);
+  const h = Math.max(34, lineCount * 16);
+  const offsets = [[12,-20],[-w-12,-20],[12,12],[-w-12,12],[16,-6],[-w-16,-6],[-w/2,-24],[-w/2,14]];
   for (const [ox, oy] of offsets) {
-    const b = { x: p.x + ox, y: p.y + oy, w, h, leader: false };
+    const b = { x: p.x + ox, y: p.y + oy, w, h };
     if (clear(b, occupied, p)) return b;
   }
-  return { x: p.x + 14, y: p.y + 14, w, h, leader: true };
+  return { x: p.x + 18, y: p.y + 18, w, h };
 }
 
 function clear(b, occupied, p) {
@@ -465,8 +465,8 @@ function drawFixedHud(W, H, spanX, scalePxPerUnit, rotationDeg = 0) {
     g.append(el("text", { x, y, "font-size": 11 }, t));
   });
 
-  const colorScaleX = W - 300;
-  const colorScaleY = H - 250;
+  const colorScaleX = 30;
+  const colorScaleY = 30;
   const colorScaleRows = Object.keys(ANGLE_COLORS)
     .map((k) => Number.parseInt(k, 10))
     .sort((a, b) => a - b);
@@ -541,6 +541,7 @@ async function exportPdf() {
   const svg = $("diagramSvg").cloneNode(true);
   svg.setAttribute("width", String(pageWidth - margin * 2));
   svg.setAttribute("height", String(pageHeight - margin * 2));
+  svg.querySelectorAll('[data-print-outline="true"]').forEach((node) => node.remove());
 
   try {
     const pngDataUrl = await svgToPng(svg, pageWidth - margin * 2, pageHeight - margin * 2);

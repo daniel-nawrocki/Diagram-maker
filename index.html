@@ -78,9 +78,14 @@
           <div class="controls-row icon-tools">
             <button id="openMetadataBtn" class="icon-btn" title="Edit shot metadata" aria-label="Edit shot metadata">🧾 Metadata</button>
             <button id="openNotesBtn" class="icon-btn" title="Edit notes" aria-label="Edit notes">📝 Notes</button>
-            <button id="textSizeDownBtn" class="icon-btn" title="Decrease callout text size" aria-label="Decrease callout text size">A−</button>
-            <span id="textSizeValue" aria-live="polite">Text 10px</span>
-            <button id="textSizeUpBtn" class="icon-btn" title="Increase callout text size" aria-label="Increase callout text size">A+</button>
+            <label>Hole Size
+              <input id="holeSize" type="range" min="4" max="16" step="1" value="7" />
+            </label>
+            <span id="holeSizeValue" aria-live="polite">Hole 7px</span>
+            <label>Depth Text
+              <input id="depthTextSize" type="range" min="8" max="18" step="1" value="10" />
+            </label>
+            <span id="depthTextSizeValue" aria-live="polite">Depth 10px</span>
           </div>
         </div>
       </details>

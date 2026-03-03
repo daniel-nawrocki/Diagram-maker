@@ -31,9 +31,9 @@ It imports arbitrary CSV drill-hole data, lets users map columns, validates rows
 - Local mapping presets (save/load/delete via `localStorage`).
 - True-scale SVG rendering with fixed aspect ratio.
 - Hole marker + bearing arrow + label density options (vertical 0° holes omit bearing arrows):
-  - Minimal: ID only
-  - Standard: ID + depth
-  - Full: ID + depth (angle is shown at arrow tip)
+  - Hollow, scalable hole markers with in-hole IDs
+  - Independent depth text size control
+  - Non-vertical angle indicators with minimum visible length
 - Smart label placement (NE/NW/SE/SW/E/W/N/S) with leader-line fallback.
 - Fixed north arrow, auto scale bar, optional grid, clean shot metadata legend.
 - Pan/zoom, Fit to Screen, Fit to Page (orientation-aware), and north-rotation of diagram geometry only (0/90/180/270) while legend/north arrow/scale remain fixed.

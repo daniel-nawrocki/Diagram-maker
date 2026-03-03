@@ -34,7 +34,7 @@ footer {
 .app-header p { color: var(--muted); font-size: 0.84rem; margin-top: 0.1rem; }
 .app-shell {
   display: grid;
-  grid-template-columns: minmax(290px, 24vw) 1fr;
+  grid-template-columns: 1fr minmax(320px, 26vw);
   gap: 0.75rem;
   height: calc(100vh - 104px);
   padding: 0.7rem;
@@ -46,6 +46,7 @@ footer {
   box-shadow: 0 0 0 1px rgba(55, 189, 248, 0.08) inset;
 }
 .sidebar {
+  order: 2;
   padding: 0.55rem;
   overflow: auto;
   display: flex;
@@ -68,6 +69,7 @@ footer {
 .submenu[open] summary::after { content: "▴"; }
 .submenu-content { padding: 0 0.7rem 0.7rem; }
 .workspace {
+  order: 1;
   display: grid;
   grid-template-rows: auto 1fr;
   min-height: 0;
@@ -107,11 +109,21 @@ button:hover { border-color: var(--accent); }
   position: relative;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #f8fafc;
+  background: #0d1a2d;
   overflow: hidden;
   min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-#diagramSvg { width: 100%; height: 100%; display: block; }
+#diagramSvg {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+  background: #ffffff;
+}
 table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
 th, td { border: 1px solid #2a3d58; padding: 0.3rem 0.4rem; white-space: nowrap; text-align: left; }
 th {

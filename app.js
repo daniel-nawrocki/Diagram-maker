@@ -208,6 +208,17 @@ function resolveDiagramScale(autoScale) {
   return autoScale * factor;
 }
 
+function getDiagramCanvasSize() {
+  const orient = $("orientation")?.value === "portrait" ? "portrait" : "landscape";
+  const pageWidth = orient === "portrait" ? 612 : 792;
+  const pageHeight = orient === "portrait" ? 792 : 612;
+  const margin = 20;
+  return {
+    width: pageWidth - margin * 2,
+    height: pageHeight - margin * 2,
+  };
+}
+
 function projectedRows() {
   if (!state.imported.length) return [];
   const mode = effectiveMode();
@@ -240,7 +251,9 @@ function renderDiagram() {
   const data = projectedRows();
   svg.innerHTML = "";
 
-  const W = 1100, H = 850, margin = 70;
+  const { width: W, height: H } = getDiagramCanvasSize();
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const margin = 48;
   const xs = data.map((d) => d.x), ys = data.map((d) => d.y);
   const minX = data.length ? Math.min(...xs) : 0;
   const maxX = data.length ? Math.max(...xs) : 100;
@@ -262,7 +275,6 @@ function renderDiagram() {
   const rotationTransform = rotation ? `rotate(${rotation} ${W / 2} ${H / 2})` : "";
   const geo = el("g", { transform: rotationTransform });
   const labels = el("g", { transform: rotationTransform });
-  root.append(drawPrintAreaOutline(W, H));
   const keepTextUpright = (attrs) => {
     if (!rotation) return attrs;
     return { ...attrs, transform: `rotate(${-rotation} ${attrs.x} ${attrs.y})` };
@@ -322,48 +334,6 @@ function drawGrid(w, h, step) {
   const g = el("g", { stroke: "#eef2f7", "stroke-width": 1 });
   for (let x = 0; x <= w; x += step) g.append(el("line", { x1: x, y1: 0, x2: x, y2: h }));
   for (let y = 0; y <= h; y += step) g.append(el("line", { x1: 0, y1: y, x2: w, y2: y }));
-  return g;
-}
-
-function drawPrintAreaOutline(W, H) {
-  const orient = $("orientation")?.value === "portrait" ? "portrait" : "landscape";
-  const pageWidth = orient === "portrait" ? 612 : 792;
-  const pageHeight = orient === "portrait" ? 792 : 612;
-  const printMargin = 20;
-  const printableWidth = pageWidth - printMargin * 2;
-  const printableHeight = pageHeight - printMargin * 2;
-  const printableRatio = printableWidth / printableHeight;
-
-  const outerPadding = 28;
-  const maxWidth = W - outerPadding * 2;
-  const maxHeight = H - outerPadding * 2;
-  let boxWidth = maxWidth;
-  let boxHeight = boxWidth / printableRatio;
-  if (boxHeight > maxHeight) {
-    boxHeight = maxHeight;
-    boxWidth = boxHeight * printableRatio;
-  }
-
-  const x = (W - boxWidth) / 2;
-  const y = (H - boxHeight) / 2;
-  const g = el("g", {});
-  g.setAttribute("data-print-outline", "true");
-  g.append(el("rect", {
-    x,
-    y,
-    width: boxWidth,
-    height: boxHeight,
-    fill: "none",
-    stroke: "#94a3b8",
-    "stroke-width": 1,
-    "stroke-dasharray": "8 6",
-  }));
-  g.append(el("text", {
-    x: x + 8,
-    y: y - 6,
-    "font-size": 10,
-    fill: "#64748b",
-  }, `${orient === "portrait" ? "Portrait" : "Landscape"} printable area`));
   return g;
 }
 

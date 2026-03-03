@@ -60,6 +60,10 @@ const state = {
   transform: { scale: 1, tx: 0, ty: 0 },
   sort: { key: "hole_id", dir: 1 },
   labelFontSize: 10,
+  annotations: [],
+  activePath: "",
+  activeColor: "#38bdf8",
+  activeWidth: 2,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -284,6 +288,7 @@ function renderDiagram() {
   }
 
   const placedLabels = [];
+  const occupiedHazards = [];
   const baseFont = state.labelFontSize;
   const lineHeight = baseFont + 4;
   data.forEach((d) => {
@@ -296,13 +301,19 @@ function renderDiagram() {
     geo.append(el("circle", { cx: p.x, cy: p.y, r: 3, fill: "#111827" }));
     if (!isVertical) {
       geo.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: angleColor, "stroke-width": 1.1, "marker-end": "url(#arrowHead)" }));
+      occupiedHazards.push(rectFromPoints(p.x, p.y, p.x + dx, p.y + dy, 4));
     }
+    occupiedHazards.push({ x: p.x - 5, y: p.y - 5, w: 10, h: 10 });
 
     const labelInfo = labelParts(d);
     if (labelInfo.lines.length) {
       const maxLen = Math.max(...labelInfo.lines.map((line) => line.text.length));
-      const bbox = placeLabel(p, maxLen, labelInfo.lines.length, placedLabels, baseFont);
-      labels.append(el("line", { x1: p.x, y1: p.y, x2: bbox.x, y2: bbox.y + bbox.h / 2, stroke: "#9ca3af", "stroke-width": 0.8 }));
+      const bbox = placeLabel(p, maxLen, labelInfo.lines.length, placedLabels, occupiedHazards, baseFont);
+      const anchor = { x: bbox.x + bbox.w / 2, y: bbox.y };
+      const leaderLength = Math.hypot(anchor.x - p.x, anchor.y - p.y);
+      if (leaderLength > 30) {
+        labels.append(el("line", { x1: p.x, y1: p.y, x2: anchor.x, y2: anchor.y, stroke: "#9ca3af", "stroke-width": 0.8 }));
+      }
       const label = el("text", keepTextUpright({ x: bbox.x, y: bbox.y + baseFont, "font-size": baseFont }));
       labelInfo.lines.forEach((line, idx) => {
         label.append(el("tspan", {
@@ -315,6 +326,7 @@ function renderDiagram() {
       });
       labels.append(label);
       placedLabels.push(bbox);
+      occupiedHazards.push(bbox);
     }
   });
 
@@ -325,6 +337,7 @@ function renderDiagram() {
   svg.append(el("defs", {}, el("marker", { id: "arrowHead", viewBox: "0 0 10 10", refX: "8", refY: "5", markerWidth: "5", markerHeight: "5", orient: "auto-start-reverse" }, el("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "#374151" }))));
   root.append(geo);
   root.append(labels);
+  root.append(drawAnnotations());
   svg.append(root);
   svg.append(drawFixedHud(W, H, spanX, scale, rotation));
   renderTable();
@@ -357,23 +370,61 @@ function getAngleColor(angleDeg) {
   return ANGLE_COLORS[normalizeAngleValue(angleDeg)] || "#374151";
 }
 
-function placeLabel(p, longestLineLength, lineCount, occupied, fontSize = 10) {
+function placeLabel(p, longestLineLength, lineCount, occupied, hazards, fontSize = 10) {
   const w = Math.max(50, longestLineLength * (fontSize * 0.72));
   const h = Math.max(fontSize + 4, lineCount * (fontSize + 4));
-  const offsets = [[12,-20],[-w-12,-20],[12,12],[-w-12,12],[16,-6],[-w-16,-6],[-w/2,-24],[-w/2,14]];
+  const offsets = [[-w / 2, 10], [12, 12], [-w - 12, 12], [12, -22], [-w - 12, -22], [18, -4], [-w - 18, -4], [-w / 2, -28]];
   for (const [ox, oy] of offsets) {
     const b = { x: p.x + ox, y: p.y + oy, w, h };
-    if (clear(b, occupied, p)) return b;
+    if (clear(b, occupied, hazards, p)) return b;
   }
-  return { x: p.x + 18, y: p.y + 18, w, h };
+  return { x: p.x - w / 2, y: p.y + 10, w, h };
 }
 
-function clear(b, occupied, p) {
+function clear(b, occupied, hazards, p) {
   const marker = { x: p.x - 4, y: p.y - 4, w: 8, h: 8 };
   if (intersects(b, marker)) return false;
-  return !occupied.some((o) => intersects(b, o));
+  if (occupied.some((o) => intersects(b, o))) return false;
+  return !hazards.some((h) => intersects(b, h));
 }
 const intersects = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+function rectFromPoints(x1, y1, x2, y2, pad = 0) {
+  const minX = Math.min(x1, x2) - pad;
+  const minY = Math.min(y1, y2) - pad;
+  const maxX = Math.max(x1, x2) + pad;
+  const maxY = Math.max(y1, y2) + pad;
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+function drawAnnotations() {
+  const g = el("g", { id: "annotationLayer" });
+  state.annotations.forEach((ann) => {
+    if (ann.type === "path") {
+      g.append(el("path", {
+        d: ann.d,
+        fill: "none",
+        stroke: ann.color,
+        "stroke-width": ann.width,
+        "stroke-linecap": "round",
+        "stroke-linejoin": "round",
+      }));
+    } else if (ann.type === "text") {
+      g.append(el("text", { x: ann.x, y: ann.y, fill: ann.color, "font-size": 12, "font-weight": "600" }, ann.text));
+    }
+  });
+  if (state.activePath) {
+    g.append(el("path", {
+      d: state.activePath,
+      fill: "none",
+      stroke: state.activeColor || "#38bdf8",
+      "stroke-width": state.activeWidth || 2,
+      "stroke-linecap": "round",
+      "stroke-linejoin": "round",
+    }));
+  }
+  return g;
+}
 
 function drawFixedHud(W, H, spanX, scalePxPerUnit, rotationDeg = 0) {
   const g = el("g", {});
@@ -591,9 +642,65 @@ function svgToPng(svg, width, height) {
 function bindPanZoom() {
   const svg = $("diagramSvg");
   let dragging = false, sx = 0, sy = 0;
-  svg.addEventListener("mousedown", (e) => { dragging = true; sx = e.clientX; sy = e.clientY; });
-  window.addEventListener("mouseup", () => dragging = false);
+  let drawing = false;
+  let currentPath = "";
+  const diagramPoint = (evt) => {
+    const pt = svg.createSVGPoint();
+    pt.x = evt.clientX;
+    pt.y = evt.clientY;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return null;
+    const loc = pt.matrixTransform(ctm.inverse());
+    return { x: loc.x, y: loc.y };
+  };
+
+  svg.addEventListener("mousedown", (e) => {
+    const tool = $("annotationTool")?.value || "pan";
+    if (tool === "draw") {
+      const p = diagramPoint(e);
+      if (!p) return;
+      drawing = true;
+      currentPath = `M ${p.x.toFixed(2)} ${p.y.toFixed(2)}`;
+      state.activePath = currentPath;
+      state.activeColor = $("annotationColor").value;
+      state.activeWidth = Number($("annotationWidth").value) || 2;
+      renderDiagram();
+      e.preventDefault();
+      return;
+    }
+    if (tool === "text") {
+      const p = diagramPoint(e);
+      const text = $("annotationText")?.value?.trim();
+      if (p && text) {
+        state.annotations.push({ type: "text", x: p.x, y: p.y, color: $("annotationColor").value, text });
+        renderDiagram();
+      }
+      return;
+    }
+    dragging = true;
+    sx = e.clientX;
+    sy = e.clientY;
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (drawing && currentPath) {
+      state.annotations.push({ type: "path", d: currentPath, color: $("annotationColor").value, width: Number($("annotationWidth").value) || 2 });
+      currentPath = "";
+      state.activePath = "";
+      renderDiagram();
+    }
+    drawing = false;
+    dragging = false;
+  });
   window.addEventListener("mousemove", (e) => {
+    if (drawing) {
+      const p = diagramPoint(e);
+      if (!p) return;
+      currentPath += ` L ${p.x.toFixed(2)} ${p.y.toFixed(2)}`;
+      state.activePath = currentPath;
+      renderDiagram();
+      return;
+    }
     if (!dragging) return;
     state.transform.tx += e.clientX - sx;
     state.transform.ty += e.clientY - sy;
@@ -601,6 +708,7 @@ function bindPanZoom() {
     renderDiagram();
   });
   svg.addEventListener("wheel", (e) => {
+    if (($("annotationTool")?.value || "pan") !== "pan") return;
     e.preventDefault();
     const f = e.deltaY < 0 ? 1.08 : 0.92;
     state.transform.scale = Math.min(8, Math.max(0.2, state.transform.scale * f));
@@ -640,11 +748,8 @@ function setupEvents() {
 
   RERENDER_CONTROL_IDS.forEach((id) => bindRerenderEvents($(id)));
 
-  $("fitScreenBtn").onclick = () => { state.transform = { scale: 1, tx: 0, ty: 0 }; renderDiagram(); };
   $("fitPageBtn").onclick = () => { $("diagramScale").value = "auto"; state.transform = { scale: 1, tx: 0, ty: 0 }; renderDiagram(); };
   $("exportPdfBtn").onclick = exportPdf;
-  $("exportTableCsvBtn").onclick = exportTableCsv;
-
   $("savePresetBtn").onclick = () => {
     const name = $("presetName").value.trim(); if (!name) return;
     const presets = getPresets();
@@ -673,6 +778,11 @@ function setupEvents() {
 
   $("textSizeUpBtn").onclick = () => adjustTextSize(1);
   $("textSizeDownBtn").onclick = () => adjustTextSize(-1);
+  $("clearAnnotationsBtn").onclick = () => {
+    state.annotations = [];
+    state.activePath = "";
+    renderDiagram();
+  };
 
   bindPanZoom();
 }

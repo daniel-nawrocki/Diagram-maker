@@ -403,16 +403,17 @@ function placeLabel(p, longestLineLength, lineCount, occupied, hazards, options 
   } = options;
   const w = Math.max(50, longestLineLength * (fontSize * 0.72));
   const h = Math.max(fontSize + 4, lineCount * (fontSize + 4));
-  const gap = Math.max(8, holeRadius + 3);
+  const sideGap = Math.max(8, holeRadius + 3);
+  const bottomGap = Math.max(1, Math.round(holeRadius * 0.2));
   const offsets = [
-    [-w / 2, -(h + gap)],
-    [gap, -h / 2],
-    [-(w + gap), -h / 2],
-    [-w / 2, gap],
-    [gap, -(h + gap * 0.2)],
-    [-(w + gap), -(h + gap * 0.2)],
-    [gap, gap * 0.2],
-    [-(w + gap), gap * 0.2],
+    [-w / 2, holeRadius + bottomGap],
+    [-w / 2, -(h + sideGap)],
+    [sideGap, -h / 2],
+    [-(w + sideGap), -h / 2],
+    [sideGap, -(h + sideGap * 0.2)],
+    [-(w + sideGap), -(h + sideGap * 0.2)],
+    [sideGap, sideGap * 0.2],
+    [-(w + sideGap), sideGap * 0.2],
   ];
   for (const [ox, oy] of offsets) {
     const b = { x: p.x + ox, y: p.y + oy, w, h };

@@ -16,14 +16,13 @@
       <p>True-scale, print-ready blast hole diagrams from CSV.</p>
     </div>
     <div class="header-actions">
-      <button id="fitScreenBtn">Fit Screen</button>
       <button id="fitPageBtn">Fit Page</button>
       <button id="exportPdfBtn">Export PDF</button>
     </div>
   </header>
 
   <main class="app-shell">
-    <aside class="sidebar panel">
+    <aside class="sidebar panel left-sidebar">
       <details class="submenu" open>
         <summary>Import & Mapping</summary>
         <div class="submenu-content">
@@ -54,6 +53,45 @@
       </details>
 
       <details class="submenu" open>
+        <summary>Metadata</summary>
+        <div class="submenu-content">
+          <div class="controls-grid metadata-grid">
+            <label>Shot Number <input id="metaShot" /></label>
+            <label>Face Pattern <input id="metaFace" /></label>
+            <label>Interior Pattern <input id="metaInterior" /></label>
+            <label>Hole Diameter <input id="metaDiameter" /></label>
+            <label>Bench <input id="metaBench" /></label>
+            <label>Date <input id="metaDate" type="date" /></label>
+          </div>
+          <label>Notes <textarea id="metaNotes" rows="4"></textarea></label>
+        </div>
+      </details>
+    </aside>
+
+    <section class="workspace panel">
+      <div class="workspace-head">
+        <h2>Diagram Workspace</h2>
+        <div class="controls-row">
+          <button id="openTableBtn">View Table</button>
+          <button id="exportTableCsvBtn">Export Table CSV</button>
+        </div>
+      </div>
+      <div id="diagramWrap" class="diagram-wrap">
+        <svg id="diagramSvg" viewBox="0 0 1100 850"></svg>
+        <div id="holePopup" class="hole-popup" hidden>
+          <h4 id="holePopupTitle">Hole</h4>
+          <label>Pattern <input id="holePopupPattern" /></label>
+          <label>Notes <textarea id="holePopupNotes" rows="2"></textarea></label>
+          <div class="controls-row">
+            <button id="holePopupSaveBtn">Save</button>
+            <button id="holePopupCloseBtn" type="button">Close</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="sidebar panel right-sidebar">
+      <details class="submenu" open>
         <summary>Diagram Adjustments</summary>
         <div class="submenu-content">
           <div class="controls-grid">
@@ -77,8 +115,6 @@
             <label><input type="checkbox" id="showCoordTable" checked /> Include coordinates in table</label>
           </div>
           <div class="controls-row icon-tools">
-            <button id="openMetadataBtn" class="icon-btn" title="Edit shot metadata" aria-label="Edit shot metadata">🧾 Metadata</button>
-            <button id="openNotesBtn" class="icon-btn" title="Edit notes" aria-label="Edit notes">📝 Notes</button>
             <button id="textSizeDownBtn" class="icon-btn" title="Decrease callout text size" aria-label="Decrease callout text size">A−</button>
             <span id="textSizeValue" aria-live="polite">Text 10px</span>
             <button id="textSizeUpBtn" class="icon-btn" title="Increase callout text size" aria-label="Increase callout text size">A+</button>
@@ -111,60 +147,11 @@
         </div>
       </details>
     </aside>
-
-    <section class="workspace panel">
-      <div class="workspace-head">
-        <h2>Diagram Workspace</h2>
-        <div class="controls-row">
-          <button id="openTableBtn">View Table</button>
-          <button id="exportTableCsvBtn">Export Table CSV</button>
-        </div>
-      </div>
-      <div id="diagramWrap" class="diagram-wrap">
-        <svg id="diagramSvg" viewBox="0 0 1100 850"></svg>
-        <div id="holePopup" class="hole-popup" hidden>
-          <h4 id="holePopupTitle">Hole</h4>
-          <label>Pattern <input id="holePopupPattern" /></label>
-          <label>Notes <textarea id="holePopupNotes" rows="2"></textarea></label>
-          <div class="controls-row">
-            <button id="holePopupSaveBtn">Save</button>
-            <button id="holePopupCloseBtn" type="button">Close</button>
-          </div>
-        </div>
-      </div>
-    </section>
   </main>
 
   <footer>
     <small>Angle definition: degrees from vertical down (0° = vertical, 10° = 10° off vertical).</small>
   </footer>
-
-  <dialog id="metadataDialog">
-    <form method="dialog" class="dialog-form">
-      <h3>Shot Metadata</h3>
-      <div class="controls-grid metadata-grid">
-        <label>Shot Number <input id="metaShot" /></label>
-        <label>Face Pattern <input id="metaFace" /></label>
-        <label>Interior Pattern <input id="metaInterior" /></label>
-        <label>Hole Diameter <input id="metaDiameter" /></label>
-        <label>Bench <input id="metaBench" /></label>
-        <label>Date <input id="metaDate" type="date" /></label>
-      </div>
-      <menu>
-        <button value="cancel" type="button" id="closeMetadataBtn">Close</button>
-      </menu>
-    </form>
-  </dialog>
-
-  <dialog id="notesDialog">
-    <form method="dialog" class="dialog-form">
-      <h3>Shot Notes</h3>
-      <label>Notes <textarea id="metaNotes" rows="4"></textarea></label>
-      <menu>
-        <button value="cancel" type="button" id="closeNotesBtn">Close</button>
-      </menu>
-    </form>
-  </dialog>
 
   <dialog id="tableDialog">
     <form method="dialog" class="dialog-form table-dialog-form">

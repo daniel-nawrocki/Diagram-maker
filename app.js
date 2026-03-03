@@ -23,7 +23,6 @@ const RERENDER_CONTROL_IDS = [
   "showHoleId",
   "orientation",
   "diagramRotation",
-  "printRotation",
   "metaShot",
   "metaFace",
   "metaInterior",
@@ -60,6 +59,7 @@ const state = {
   transform: { scale: 1, tx: 0, ty: 0 },
   sort: { key: "hole_id", dir: 1 },
   labelFontSize: 10,
+  annotations: { paths: [], texts: [] },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -240,7 +240,16 @@ function renderDiagram() {
   const data = projectedRows();
   svg.innerHTML = "";
 
-  const W = 1100, H = 850, margin = 70;
+  const orient = $("orientation")?.value === "portrait" ? "portrait" : "landscape";
+  const printableRatio = orient === "portrait" ? 572 / 752 : 752 / 572;
+  let W = 1100;
+  let H = Math.round(W / printableRatio);
+  if (H > 850) {
+    H = 850;
+    W = Math.round(H * printableRatio);
+  }
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const margin = 44;
   const xs = data.map((d) => d.x), ys = data.map((d) => d.y);
   const minX = data.length ? Math.min(...xs) : 0;
   const maxX = data.length ? Math.max(...xs) : 100;
@@ -262,7 +271,7 @@ function renderDiagram() {
   const rotationTransform = rotation ? `rotate(${rotation} ${W / 2} ${H / 2})` : "";
   const geo = el("g", { transform: rotationTransform });
   const labels = el("g", { transform: rotationTransform });
-  root.append(drawPrintAreaOutline(W, H));
+  root.append(el("rect", { x: 0, y: 0, width: W, height: H, fill: "#ffffff" }));
   const keepTextUpright = (attrs) => {
     if (!rotation) return attrs;
     return { ...attrs, transform: `rotate(${-rotation} ${attrs.x} ${attrs.y})` };
@@ -272,6 +281,7 @@ function renderDiagram() {
   }
 
   const placedLabels = [];
+  const obstacles = [];
   const baseFont = state.labelFontSize;
   const lineHeight = baseFont + 4;
   data.forEach((d) => {
@@ -282,15 +292,22 @@ function renderDiagram() {
     const dx = Math.sin(bearingRad) * 24;
     const dy = -Math.cos(bearingRad) * 24;
     geo.append(el("circle", { cx: p.x, cy: p.y, r: 3, fill: "#111827" }));
+    obstacles.push({ x: p.x - 5, y: p.y - 5, w: 10, h: 10 });
     if (!isVertical) {
       geo.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: angleColor, "stroke-width": 1.1, "marker-end": "url(#arrowHead)" }));
+      obstacles.push({ x: Math.min(p.x, p.x + dx) - 4, y: Math.min(p.y, p.y + dy) - 4, w: Math.abs(dx) + 8, h: Math.abs(dy) + 8 });
     }
 
     const labelInfo = labelParts(d);
     if (labelInfo.lines.length) {
       const maxLen = Math.max(...labelInfo.lines.map((line) => line.text.length));
-      const bbox = placeLabel(p, maxLen, labelInfo.lines.length, placedLabels, baseFont);
-      labels.append(el("line", { x1: p.x, y1: p.y, x2: bbox.x, y2: bbox.y + bbox.h / 2, stroke: "#9ca3af", "stroke-width": 0.8 }));
+      const bbox = placeLabel(p, maxLen, labelInfo.lines.length, placedLabels, obstacles, baseFont);
+      const anchorX = bbox.x + bbox.w / 2;
+      const anchorY = bbox.y;
+      const leaderDistance = Math.hypot(anchorX - p.x, anchorY - p.y);
+      if (leaderDistance > 34) {
+        labels.append(el("line", { x1: p.x, y1: p.y, x2: anchorX, y2: anchorY, stroke: "#9ca3af", "stroke-width": 0.8 }));
+      }
       const label = el("text", keepTextUpright({ x: bbox.x, y: bbox.y + baseFont, "font-size": baseFont }));
       labelInfo.lines.forEach((line, idx) => {
         label.append(el("tspan", {
@@ -313,6 +330,7 @@ function renderDiagram() {
   svg.append(el("defs", {}, el("marker", { id: "arrowHead", viewBox: "0 0 10 10", refX: "8", refY: "5", markerWidth: "5", markerHeight: "5", orient: "auto-start-reverse" }, el("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "#374151" }))));
   root.append(geo);
   root.append(labels);
+  root.append(renderAnnotations());
   svg.append(root);
   svg.append(drawFixedHud(W, H, spanX, scale, rotation));
   renderTable();
@@ -322,48 +340,6 @@ function drawGrid(w, h, step) {
   const g = el("g", { stroke: "#eef2f7", "stroke-width": 1 });
   for (let x = 0; x <= w; x += step) g.append(el("line", { x1: x, y1: 0, x2: x, y2: h }));
   for (let y = 0; y <= h; y += step) g.append(el("line", { x1: 0, y1: y, x2: w, y2: y }));
-  return g;
-}
-
-function drawPrintAreaOutline(W, H) {
-  const orient = $("orientation")?.value === "portrait" ? "portrait" : "landscape";
-  const pageWidth = orient === "portrait" ? 612 : 792;
-  const pageHeight = orient === "portrait" ? 792 : 612;
-  const printMargin = 20;
-  const printableWidth = pageWidth - printMargin * 2;
-  const printableHeight = pageHeight - printMargin * 2;
-  const printableRatio = printableWidth / printableHeight;
-
-  const outerPadding = 28;
-  const maxWidth = W - outerPadding * 2;
-  const maxHeight = H - outerPadding * 2;
-  let boxWidth = maxWidth;
-  let boxHeight = boxWidth / printableRatio;
-  if (boxHeight > maxHeight) {
-    boxHeight = maxHeight;
-    boxWidth = boxHeight * printableRatio;
-  }
-
-  const x = (W - boxWidth) / 2;
-  const y = (H - boxHeight) / 2;
-  const g = el("g", {});
-  g.setAttribute("data-print-outline", "true");
-  g.append(el("rect", {
-    x,
-    y,
-    width: boxWidth,
-    height: boxHeight,
-    fill: "none",
-    stroke: "#94a3b8",
-    "stroke-width": 1,
-    "stroke-dasharray": "8 6",
-  }));
-  g.append(el("text", {
-    x: x + 8,
-    y: y - 6,
-    "font-size": 10,
-    fill: "#64748b",
-  }, `${orient === "portrait" ? "Portrait" : "Landscape"} printable area`));
   return g;
 }
 
@@ -387,21 +363,21 @@ function getAngleColor(angleDeg) {
   return ANGLE_COLORS[normalizeAngleValue(angleDeg)] || "#374151";
 }
 
-function placeLabel(p, longestLineLength, lineCount, occupied, fontSize = 10) {
+function placeLabel(p, longestLineLength, lineCount, occupied, obstacles, fontSize = 10) {
   const w = Math.max(50, longestLineLength * (fontSize * 0.72));
   const h = Math.max(fontSize + 4, lineCount * (fontSize + 4));
-  const offsets = [[12,-20],[-w-12,-20],[12,12],[-w-12,12],[16,-6],[-w-16,-6],[-w/2,-24],[-w/2,14]];
+  const offsets = [[-w / 2, 10], [12, 10], [-w - 12, 10], [14, -18], [-w - 14, -18], [16, 22], [-w - 16, 22], [-w / 2, -26]];
   for (const [ox, oy] of offsets) {
     const b = { x: p.x + ox, y: p.y + oy, w, h };
-    if (clear(b, occupied, p)) return b;
+    if (clear(b, occupied, obstacles)) return b;
   }
   return { x: p.x + 18, y: p.y + 18, w, h };
 }
 
-function clear(b, occupied, p) {
-  const marker = { x: p.x - 4, y: p.y - 4, w: 8, h: 8 };
-  if (intersects(b, marker)) return false;
-  return !occupied.some((o) => intersects(b, o));
+function clear(b, occupied, obstacles) {
+  if (occupied.some((o) => intersects(b, o))) return false;
+  if (obstacles.some((o) => intersects(b, o))) return false;
+  return true;
 }
 const intersects = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
@@ -618,19 +594,96 @@ function svgToPng(svg, width, height) {
   });
 }
 
-function bindPanZoom() {
+
+function renderAnnotations() {
+  const g = el("g", { "data-annotations": "true" });
+  state.annotations.paths.forEach((path) => {
+    if (!path.points?.length) return;
+    const d = path.points.map((pt, idx) => `${idx === 0 ? "M" : "L"} ${pt.x} ${pt.y}`).join(" ");
+    g.append(el("path", {
+      d,
+      fill: "none",
+      stroke: path.color,
+      "stroke-width": path.width,
+      "stroke-linecap": "round",
+      "stroke-linejoin": "round",
+    }));
+  });
+  state.annotations.texts.forEach((note) => {
+    g.append(el("text", { x: note.x, y: note.y, fill: note.color, "font-size": 13, "font-weight": "600" }, note.text));
+  });
+  return g;
+}
+
+function clientPointToRoot(svg, evt) {
+  const pt = svg.createSVGPoint();
+  pt.x = evt.clientX;
+  pt.y = evt.clientY;
+  const local = pt.matrixTransform(svg.getScreenCTM().inverse());
+  return {
+    x: (local.x - state.transform.tx) / state.transform.scale,
+    y: (local.y - state.transform.ty) / state.transform.scale,
+  };
+}
+
+function bindCanvasInteractions() {
   const svg = $("diagramSvg");
-  let dragging = false, sx = 0, sy = 0;
-  svg.addEventListener("mousedown", (e) => { dragging = true; sx = e.clientX; sy = e.clientY; });
-  window.addEventListener("mouseup", () => dragging = false);
+  let dragging = false;
+  let drawing = false;
+  let sx = 0;
+  let sy = 0;
+  let activePath = null;
+
+  svg.addEventListener("mousedown", (e) => {
+    const tool = $("annotationTool")?.value || "pan";
+    if (tool === "draw") {
+      drawing = true;
+      const pt = clientPointToRoot(svg, e);
+      activePath = { color: $("annotationColor").value, width: Number($("annotationWidth").value), points: [pt] };
+      state.annotations.paths.push(activePath);
+      renderDiagram();
+      return;
+    }
+    if (tool !== "pan") return;
+    dragging = true;
+    sx = e.clientX;
+    sy = e.clientY;
+  });
+
+  window.addEventListener("mouseup", () => {
+    dragging = false;
+    drawing = false;
+    activePath = null;
+  });
+
   window.addEventListener("mousemove", (e) => {
+    if (drawing && activePath) {
+      activePath.points.push(clientPointToRoot(svg, e));
+      renderDiagram();
+      return;
+    }
     if (!dragging) return;
     state.transform.tx += e.clientX - sx;
     state.transform.ty += e.clientY - sy;
-    sx = e.clientX; sy = e.clientY;
+    sx = e.clientX;
+    sy = e.clientY;
     renderDiagram();
   });
+
+  svg.addEventListener("click", (e) => {
+    if (($("annotationTool")?.value || "pan") !== "text") return;
+    const pt = clientPointToRoot(svg, e);
+    state.annotations.texts.push({
+      x: pt.x,
+      y: pt.y,
+      color: $("annotationColor").value,
+      text: $("annotationText").value.trim() || "Note",
+    });
+    renderDiagram();
+  });
+
   svg.addEventListener("wheel", (e) => {
+    if (($("annotationTool")?.value || "pan") !== "pan") return;
     e.preventDefault();
     const f = e.deltaY < 0 ? 1.08 : 0.92;
     state.transform.scale = Math.min(8, Math.max(0.2, state.transform.scale * f));
@@ -670,7 +723,6 @@ function setupEvents() {
 
   RERENDER_CONTROL_IDS.forEach((id) => bindRerenderEvents($(id)));
 
-  $("fitScreenBtn").onclick = () => { state.transform = { scale: 1, tx: 0, ty: 0 }; renderDiagram(); };
   $("fitPageBtn").onclick = () => { $("diagramScale").value = "auto"; state.transform = { scale: 1, tx: 0, ty: 0 }; renderDiagram(); };
   $("exportPdfBtn").onclick = exportPdf;
   $("exportTableCsvBtn").onclick = exportTableCsv;
@@ -697,14 +749,13 @@ function setupEvents() {
     loadPresets();
   };
 
-  bindDialog("openMetadataBtn", "metadataDialog", "closeMetadataBtn");
-  bindDialog("openNotesBtn", "notesDialog", "closeNotesBtn");
   bindDialog("openTableBtn", "tableDialog", "closeTableBtn");
 
   $("textSizeUpBtn").onclick = () => adjustTextSize(1);
   $("textSizeDownBtn").onclick = () => adjustTextSize(-1);
 
-  bindPanZoom();
+  $("clearAnnotationsBtn").onclick = () => { state.annotations = { paths: [], texts: [] }; renderDiagram(); };
+  bindCanvasInteractions();
 }
 
 function adjustTextSize(delta) {

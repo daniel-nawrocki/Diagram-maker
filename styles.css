@@ -34,10 +34,14 @@ footer {
 .app-header p { color: var(--muted); font-size: 0.84rem; margin-top: 0.1rem; }
 .app-shell {
   display: grid;
-  grid-template-columns: minmax(290px, 24vw) 1fr;
+  grid-template-columns: minmax(280px, 22vw) minmax(0, 1fr) minmax(280px, 22vw);
   gap: 0.75rem;
   height: calc(100vh - 104px);
   padding: 0.7rem;
+}
+.left-sidebar,
+.right-sidebar {
+  min-width: 0;
 }
 .panel {
   border: 1px solid var(--line);
@@ -107,7 +111,7 @@ button:hover { border-color: var(--accent); }
   position: relative;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #f8fafc;
+  background: #e2e8f0;
   overflow: hidden;
   min-height: 0;
 }

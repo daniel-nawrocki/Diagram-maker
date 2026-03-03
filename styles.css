@@ -193,9 +193,14 @@ dialog {
 .hole-popup textarea { resize: vertical; }
 
 
-.icon-tools #textSizeValue {
+.icon-tools #holeSizeValue,
+.icon-tools #depthTextSizeValue {
   font-size: 0.8rem;
   color: var(--muted);
-  min-width: 4.8rem;
+  min-width: 5.8rem;
   text-align: center;
+}
+
+.icon-tools input[type="range"] {
+  width: 110px;
 }

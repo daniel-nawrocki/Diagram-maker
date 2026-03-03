@@ -17,6 +17,8 @@ const ANGLE_COLORS = {
 const PRESET_STORAGE_KEY = "blastHoleMappingPresets";
 const LABEL_FONT_MIN = 8;
 const LABEL_FONT_MAX = 18;
+const HOLE_RADIUS_MIN = 4;
+const HOLE_RADIUS_MAX = 16;
 const RERENDER_CONTROL_IDS = [
   "units",
   "showGrid",
@@ -59,7 +61,8 @@ const state = {
   errors: [],
   transform: { scale: 1, tx: 0, ty: 0 },
   sort: { key: "hole_id", dir: 1 },
-  labelFontSize: 10,
+  depthFontSize: 10,
+  holeRadius: 7,
   annotations: [],
   activePath: "",
   activeColor: "#38bdf8",
@@ -289,32 +292,46 @@ function renderDiagram() {
 
   const placedLabels = [];
   const occupiedHazards = [];
-  const baseFont = state.labelFontSize;
-  const lineHeight = baseFont + 4;
+  const depthFont = state.depthFontSize;
+  const lineHeight = depthFont + 4;
+  const holeRadius = state.holeRadius;
+  const holeIdFont = Math.max(7, Math.min(18, holeRadius * 1.12));
   data.forEach((d) => {
     const p = toSvg(d.x, d.y);
     const isVertical = Math.abs(d.angle_deg) < 0.01;
     const angleColor = getAngleColor(d.angle_deg);
     const bearingRad = (d.bearing_deg * Math.PI) / 180;
-    const dx = Math.sin(bearingRad) * 24;
-    const dy = -Math.cos(bearingRad) * 24;
-    geo.append(el("circle", { cx: p.x, cy: p.y, r: 3, fill: "#111827" }));
+    const angleLen = Math.max(24, holeRadius * 3.2);
+    const angleStroke = Math.max(1.1, holeRadius * 0.2);
+    const dx = Math.sin(bearingRad) * angleLen;
+    const dy = -Math.cos(bearingRad) * angleLen;
+    geo.append(el("circle", { cx: p.x, cy: p.y, r: holeRadius, fill: "#ffffff", stroke: "#111827", "stroke-width": 1.2 }));
+    if ($("showHoleId").checked) {
+      geo.append(el("text", keepTextUpright({
+        x: p.x,
+        y: p.y + holeIdFont * 0.34,
+        "font-size": holeIdFont,
+        "font-weight": "700",
+        "text-anchor": "middle",
+        fill: "#1d4ed8",
+      }), d.hole_id));
+    }
     if (!isVertical) {
-      geo.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: angleColor, "stroke-width": 1.1, "marker-end": "url(#arrowHead)" }));
+      geo.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: angleColor, "stroke-width": angleStroke, "marker-end": "url(#arrowHead)" }));
       occupiedHazards.push(rectFromPoints(p.x, p.y, p.x + dx, p.y + dy, 4));
     }
-    occupiedHazards.push({ x: p.x - 5, y: p.y - 5, w: 10, h: 10 });
+    occupiedHazards.push({ x: p.x - holeRadius - 2, y: p.y - holeRadius - 2, w: (holeRadius + 2) * 2, h: (holeRadius + 2) * 2 });
 
     const labelInfo = labelParts(d);
     if (labelInfo.lines.length) {
       const maxLen = Math.max(...labelInfo.lines.map((line) => line.text.length));
-      const bbox = placeLabel(p, maxLen, labelInfo.lines.length, placedLabels, occupiedHazards, baseFont);
-      const anchor = { x: bbox.x + bbox.w / 2, y: bbox.y };
+      const bbox = placeLabel(p, maxLen, labelInfo.lines.length, placedLabels, occupiedHazards, depthFont, holeRadius);
+      const anchor = { x: bbox.x + bbox.w / 2, y: bbox.y + bbox.h / 2 };
       const leaderLength = Math.hypot(anchor.x - p.x, anchor.y - p.y);
-      if (leaderLength > 30) {
+      if (leaderLength > holeRadius + 18) {
         labels.append(el("line", { x1: p.x, y1: p.y, x2: anchor.x, y2: anchor.y, stroke: "#9ca3af", "stroke-width": 0.8 }));
       }
-      const label = el("text", keepTextUpright({ x: bbox.x, y: bbox.y + baseFont, "font-size": baseFont }));
+      const label = el("text", keepTextUpright({ x: bbox.x, y: bbox.y + depthFont, "font-size": depthFont }));
       labelInfo.lines.forEach((line, idx) => {
         label.append(el("tspan", {
           x: bbox.x,
@@ -351,12 +368,9 @@ function drawGrid(w, h, step) {
 }
 
 function labelParts(d) {
-  if (!$("showHoleId").checked) return { lines: [] };
   const depth = `${Math.round(d.depth_ft)} ft`;
-  const id = d.hole_id;
   return {
     lines: [
-      { text: id, color: "#1d4ed8", bold: true },
       { text: depth, color: "#111827", bold: false },
     ],
   };
@@ -370,10 +384,20 @@ function getAngleColor(angleDeg) {
   return ANGLE_COLORS[normalizeAngleValue(angleDeg)] || "#374151";
 }
 
-function placeLabel(p, longestLineLength, lineCount, occupied, hazards, fontSize = 10) {
+function placeLabel(p, longestLineLength, lineCount, occupied, hazards, fontSize = 10, holeRadius = 7) {
   const w = Math.max(50, longestLineLength * (fontSize * 0.72));
   const h = Math.max(fontSize + 4, lineCount * (fontSize + 4));
-  const offsets = [[-w / 2, 10], [12, 12], [-w - 12, 12], [12, -22], [-w - 12, -22], [18, -4], [-w - 18, -4], [-w / 2, -28]];
+  const gap = Math.max(8, holeRadius + 3);
+  const offsets = [
+    [-w / 2, -(h + gap)],
+    [gap, -h / 2],
+    [-(w + gap), -h / 2],
+    [-w / 2, gap],
+    [gap, -(h + gap * 0.2)],
+    [-(w + gap), -(h + gap * 0.2)],
+    [gap, gap * 0.2],
+    [-(w + gap), gap * 0.2],
+  ];
   for (const [ox, oy] of offsets) {
     const b = { x: p.x + ox, y: p.y + oy, w, h };
     if (clear(b, occupied, hazards, p)) return b;
@@ -776,8 +800,12 @@ function setupEvents() {
   bindDialog("openNotesBtn", "notesDialog", "closeNotesBtn");
   bindDialog("openTableBtn", "tableDialog", "closeTableBtn");
 
-  $("textSizeUpBtn").onclick = () => adjustTextSize(1);
-  $("textSizeDownBtn").onclick = () => adjustTextSize(-1);
+  bindRerenderEvents($("holeSize"));
+  bindRerenderEvents($("depthTextSize"));
+  $("holeSize").addEventListener("input", syncSizingStateFromControls);
+  $("depthTextSize").addEventListener("input", syncSizingStateFromControls);
+  $("holeSize").addEventListener("change", syncSizingStateFromControls);
+  $("depthTextSize").addEventListener("change", syncSizingStateFromControls);
   $("clearAnnotationsBtn").onclick = () => {
     state.annotations = [];
     state.activePath = "";
@@ -787,16 +815,13 @@ function setupEvents() {
   bindPanZoom();
 }
 
-function adjustTextSize(delta) {
-  state.labelFontSize = Math.max(LABEL_FONT_MIN, Math.min(LABEL_FONT_MAX, state.labelFontSize + delta));
-  updateTextSizeUi();
-  renderDiagram();
-}
-
-function updateTextSizeUi() {
-  const label = $("textSizeValue");
-  if (!label) return;
-  label.textContent = `Text ${state.labelFontSize}px`;
+function syncSizingStateFromControls() {
+  state.holeRadius = Math.max(HOLE_RADIUS_MIN, Math.min(HOLE_RADIUS_MAX, Number($("holeSize")?.value || 7)));
+  state.depthFontSize = Math.max(LABEL_FONT_MIN, Math.min(LABEL_FONT_MAX, Number($("depthTextSize")?.value || 10)));
+  const holeLabel = $("holeSizeValue");
+  const depthLabel = $("depthTextSizeValue");
+  if (holeLabel) holeLabel.textContent = `Hole ${state.holeRadius}px`;
+  if (depthLabel) depthLabel.textContent = `Depth ${state.depthFontSize}px`;
 }
 
 function bindDialog(openBtnId, dialogId, closeBtnId) {
@@ -839,4 +864,4 @@ if ($("diagramRotation")) $("diagramRotation").value = "0";
 if ($("printRotation")) $("printRotation").value = "0";
 $("units").value = "ft";
 if ($("diagramScale")) $("diagramScale").value = "auto";
-updateTextSizeUi();
+syncSizingStateFromControls();

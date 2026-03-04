@@ -282,8 +282,6 @@ function renderDiagram() {
   const rotationTransform = rotation ? `rotate(${rotation} ${W / 2} ${H / 2})` : "";
   const geo = el("g", { transform: rotationTransform });
   const labels = el("g", { transform: rotationTransform });
-  const rotationCenter = { x: W / 2, y: H / 2 };
-  const renderBounds = { x: 0, y: 0, w: W, h: H };
   const keepTextUpright = (attrs) => {
     if (!rotation) return attrs;
     return { ...attrs, transform: `rotate(${-rotation} ${attrs.x} ${attrs.y})` };
@@ -292,10 +290,7 @@ function renderDiagram() {
     geo.appendChild(drawGrid(W, H, 50));
   }
 
-  const placedLabels = [];
-  const occupiedHazards = [];
   const depthFont = state.depthFontSize;
-  const lineHeight = depthFont + 4;
   const holeRadius = state.holeRadius;
   const holeIdFont = Math.max(7, Math.min(18, holeRadius * 1.12));
   data.forEach((d) => {
@@ -321,38 +316,28 @@ function renderDiagram() {
     }
     if (!isVertical) {
       geo.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: angleColor, "stroke-width": angleStroke, "marker-end": "url(#arrowHead)" }));
-      occupiedHazards.push(rectFromPoints(p.x, p.y, p.x + dx, p.y + dy, 4));
     }
-    occupiedHazards.push({ x: p.x - holeRadius - 2, y: p.y - holeRadius - 2, w: (holeRadius + 2) * 2, h: (holeRadius + 2) * 2 });
 
     const labelInfo = labelParts(d);
     if (labelInfo.lines.length) {
-      const maxLen = Math.max(...labelInfo.lines.map((line) => line.text.length));
-      const bbox = placeLabel(p, maxLen, labelInfo.lines.length, placedLabels, occupiedHazards, {
-        fontSize: depthFont,
-        holeRadius,
-        rotation,
-        rotationCenter,
-        bounds: renderBounds,
-      });
-      const anchor = { x: bbox.x + bbox.w / 2, y: bbox.y + bbox.h / 2 };
-      const leaderLength = Math.hypot(anchor.x - p.x, anchor.y - p.y);
-      if (leaderLength > holeRadius + 18) {
-        labels.append(el("line", { x1: p.x, y1: p.y, x2: anchor.x, y2: anchor.y, stroke: "#9ca3af", "stroke-width": 0.8 }));
-      }
-      const label = el("text", keepTextUpright({ x: bbox.x, y: bbox.y + depthFont, "font-size": depthFont }));
+      const bottomGap = Math.max(2, Math.round(holeRadius * 0.35));
+      const label = el("text", keepTextUpright({
+        x: p.x,
+        y: p.y + holeRadius + bottomGap,
+        "font-size": depthFont,
+        "text-anchor": "middle",
+        "dominant-baseline": "hanging",
+      }));
       labelInfo.lines.forEach((line, idx) => {
         label.append(el("tspan", {
-          x: bbox.x,
-          dy: idx === 0 ? 0 : lineHeight,
+          x: p.x,
+          dy: idx === 0 ? 0 : depthFont + 4,
           fill: line.color,
           "font-weight": line.bold ? "700" : "400",
-          "text-anchor": "start",
+          "text-anchor": "middle",
         }, line.text));
       });
       labels.append(label);
-      placedLabels.push(bbox);
-      occupiedHazards.push(bbox);
     }
   });
 
@@ -391,93 +376,6 @@ function normalizeAngleValue(angleDeg) {
 
 function getAngleColor(angleDeg) {
   return ANGLE_COLORS[normalizeAngleValue(angleDeg)] || "#374151";
-}
-
-function placeLabel(p, longestLineLength, lineCount, occupied, hazards, options = {}) {
-  const {
-    fontSize = 10,
-    holeRadius = 7,
-    rotation = 0,
-    rotationCenter = { x: 0, y: 0 },
-    bounds = null,
-  } = options;
-  const w = Math.max(50, longestLineLength * (fontSize * 0.72));
-  const h = Math.max(fontSize + 4, lineCount * (fontSize + 4));
-  const sideGap = Math.max(8, holeRadius + 3);
-  const bottomGap = Math.max(1, Math.round(holeRadius * 0.2));
-  const offsets = [
-    [-w / 2, holeRadius + bottomGap],
-    [-w / 2, -(h + sideGap)],
-    [sideGap, -h / 2],
-    [-(w + sideGap), -h / 2],
-    [sideGap, -(h + sideGap * 0.2)],
-    [-(w + sideGap), -(h + sideGap * 0.2)],
-    [sideGap, sideGap * 0.2],
-    [-(w + sideGap), sideGap * 0.2],
-  ];
-  for (const [ox, oy] of offsets) {
-    const b = { x: p.x + ox, y: p.y + oy, w, h };
-    if (clear(b, occupied, hazards, p, { rotation, rotationCenter, bounds })) return b;
-  }
-  return { x: p.x - w / 2, y: p.y + 10, w, h };
-}
-
-function clear(b, occupied, hazards, p, options = {}) {
-  const { rotation = 0, rotationCenter = { x: 0, y: 0 }, bounds = null } = options;
-  const marker = { x: p.x - 4, y: p.y - 4, w: 8, h: 8 };
-  if (intersects(b, marker)) return false;
-  if (occupied.some((o) => intersects(b, o))) return false;
-  if (hazards.some((h) => intersects(b, h))) return false;
-  if (!bounds) return true;
-  const rendered = rotatedRectBounds(b, rotation, rotationCenter);
-  return withinBounds(rendered, bounds, 6);
-}
-const intersects = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-
-function rotatePoint(point, rotationDeg, center) {
-  if (!rotationDeg) return { x: point.x, y: point.y };
-  const rad = (rotationDeg * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  const dx = point.x - center.x;
-  const dy = point.y - center.y;
-  return {
-    x: center.x + dx * cos - dy * sin,
-    y: center.y + dx * sin + dy * cos,
-  };
-}
-
-function rotatedRectBounds(rect, rotationDeg, center) {
-  if (!rotationDeg) return rect;
-  const corners = [
-    { x: rect.x, y: rect.y },
-    { x: rect.x + rect.w, y: rect.y },
-    { x: rect.x, y: rect.y + rect.h },
-    { x: rect.x + rect.w, y: rect.y + rect.h },
-  ].map((corner) => rotatePoint(corner, rotationDeg, center));
-  const xs = corners.map((corner) => corner.x);
-  const ys = corners.map((corner) => corner.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
-}
-
-function withinBounds(rect, bounds, margin = 0) {
-  const minX = bounds.x + margin;
-  const minY = bounds.y + margin;
-  const maxX = bounds.x + bounds.w - margin;
-  const maxY = bounds.y + bounds.h - margin;
-  return rect.x >= minX && rect.y >= minY && rect.x + rect.w <= maxX && rect.y + rect.h <= maxY;
-}
-
-function rectFromPoints(x1, y1, x2, y2, pad = 0) {
-  const minX = Math.min(x1, x2) - pad;
-  const minY = Math.min(y1, y2) - pad;
-  const maxX = Math.max(x1, x2) + pad;
-  const maxY = Math.max(y1, y2) + pad;
-  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
 }
 
 function drawAnnotations() {
@@ -832,7 +730,6 @@ function setupEvents() {
   RERENDER_CONTROL_IDS.forEach((id) => bindRerenderEvents($(id)));
 
   $("fitPageBtn").onclick = () => { $("diagramScale").value = "auto"; state.transform = { scale: 1, tx: 0, ty: 0 }; renderDiagram(); };
-  $("refitLabelsBtn").onclick = () => renderDiagram();
   $("exportPdfBtn").onclick = exportPdf;
   $("savePresetBtn").onclick = () => {
     const name = $("presetName").value.trim(); if (!name) return;

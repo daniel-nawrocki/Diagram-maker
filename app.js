@@ -282,6 +282,7 @@ function renderDiagram() {
   const rotationTransform = rotation ? `rotate(${rotation} ${W / 2} ${H / 2})` : "";
   const geo = el("g", { transform: rotationTransform });
   const labels = el("g", { transform: rotationTransform });
+  const depthLabels = el("g", {});
   const keepTextUpright = (attrs) => {
     if (!rotation) return attrs;
     return { ...attrs, transform: `rotate(${-rotation} ${attrs.x} ${attrs.y})` };
@@ -327,22 +328,24 @@ function renderDiagram() {
       }), `${Math.round(d.angle_deg)}°`));
     }
 
-    labels.append(el("text", keepTextUpright({
-      x: p.x,
-      y: p.y + holeRadius + depthFont + 3,
+    const screenPoint = rotateAroundCenter(p, rotation, { x: W / 2, y: H / 2 });
+    depthLabels.append(el("text", {
+      x: screenPoint.x,
+      y: screenPoint.y + holeRadius + depthFont + 3,
       "font-size": depthFont,
       fill: "#111827",
       "text-anchor": "middle",
-    }), `${Math.round(d.depth_ft)} ft`));
+    }, `${Math.round(d.depth_ft)} ft`));
   });
 
   if (!data.length) {
-    labels.append(el("text", { x: W / 2, y: H / 2, "text-anchor": "middle", "font-size": 18, fill: "#6b7280" }, "No renderable rows to display"));
+    depthLabels.append(el("text", { x: W / 2, y: H / 2, "text-anchor": "middle", "font-size": 18, fill: "#6b7280" }, "No renderable rows to display"));
   }
 
   svg.append(el("defs", {}, el("marker", { id: "arrowHead", viewBox: "0 0 10 10", refX: "8", refY: "5", markerWidth: "5", markerHeight: "5", orient: "auto-start-reverse" }, el("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "#374151" }))));
   root.append(geo);
   root.append(labels);
+  root.append(depthLabels);
   root.append(drawAnnotations());
   svg.append(root);
   svg.append(drawFixedHud(W, H, spanX, scale, rotation));
@@ -354,6 +357,20 @@ function drawGrid(w, h, step) {
   for (let x = 0; x <= w; x += step) g.append(el("line", { x1: x, y1: 0, x2: x, y2: h }));
   for (let y = 0; y <= h; y += step) g.append(el("line", { x1: 0, y1: y, x2: w, y2: y }));
   return g;
+}
+
+
+function rotateAroundCenter(point, rotationDeg, center) {
+  if (!rotationDeg) return point;
+  const rad = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const dx = point.x - center.x;
+  const dy = point.y - center.y;
+  return {
+    x: center.x + dx * cos - dy * sin,
+    y: center.y + dx * sin + dy * cos,
+  };
 }
 
 function normalizeAngleValue(angleDeg) {

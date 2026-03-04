@@ -282,7 +282,7 @@ function renderDiagram() {
   const rotationTransform = rotation ? `rotate(${rotation} ${W / 2} ${H / 2})` : "";
   const geo = el("g", { transform: rotationTransform });
   const labels = el("g", { transform: rotationTransform });
-  const depthLabels = el("g", {});
+  const depthLabels = el("g", { transform: rotationTransform });
   const keepTextUpright = (attrs) => {
     if (!rotation) return attrs;
     return { ...attrs, transform: `rotate(${-rotation} ${attrs.x} ${attrs.y})` };
@@ -328,14 +328,13 @@ function renderDiagram() {
       }), `${Math.round(d.angle_deg)}°`));
     }
 
-    const screenPoint = rotateAroundCenter(p, rotation, { x: W / 2, y: H / 2 });
-    depthLabels.append(el("text", {
-      x: screenPoint.x,
-      y: screenPoint.y + holeRadius + depthFont + 3,
+    depthLabels.append(el("text", keepTextUpright({
+      x: p.x,
+      y: p.y + holeRadius + depthFont + 3,
       "font-size": depthFont,
       fill: "#111827",
       "text-anchor": "middle",
-    }, `${Math.round(d.depth_ft)} ft`));
+    }), `${Math.round(d.depth_ft)} ft`));
   });
 
   if (!data.length) {
@@ -359,19 +358,6 @@ function drawGrid(w, h, step) {
   return g;
 }
 
-
-function rotateAroundCenter(point, rotationDeg, center) {
-  if (!rotationDeg) return point;
-  const rad = (rotationDeg * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  const dx = point.x - center.x;
-  const dy = point.y - center.y;
-  return {
-    x: center.x + dx * cos - dy * sin,
-    y: center.y + dx * sin + dy * cos,
-  };
-}
 
 function normalizeAngleValue(angleDeg) {
   return Math.round(Number(angleDeg));

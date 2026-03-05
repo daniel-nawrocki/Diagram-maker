@@ -302,9 +302,7 @@ function renderDiagram() {
     const angleLen = Math.max(24, holeRadius * 3.2);
     const angleStroke = Math.max(1.1, holeRadius * 0.2);
     const dx = Math.sin(bearingRad) * angleLen;
-    const dy = Math.cos(bearingRad) * angleLen;
-    const angleAnchorX = p.x;
-    const angleAnchorY = p.y + holeRadius;
+    const dy = -Math.cos(bearingRad) * angleLen;
     geo.append(el("circle", { cx: p.x, cy: p.y, r: holeRadius, fill: "#ffffff", stroke: "#111827", "stroke-width": 1.2 }));
     if ($("showHoleId").checked) {
       geo.append(el("text", keepTextUpright({
@@ -318,18 +316,10 @@ function renderDiagram() {
       }), d.hole_id));
     }
     if (!isVertical) {
-      geo.append(el("line", {
-        x1: angleAnchorX,
-        y1: angleAnchorY,
-        x2: angleAnchorX + dx,
-        y2: angleAnchorY + dy,
-        stroke: angleColor,
-        "stroke-width": angleStroke,
-        "marker-end": "url(#arrowHead)",
-      }));
+      geo.append(el("line", { x1: p.x, y1: p.y, x2: p.x + dx, y2: p.y + dy, stroke: angleColor, "stroke-width": angleStroke, "marker-end": "url(#arrowHead)" }));
       labels.append(el("text", keepTextUpright({
-        x: angleAnchorX + dx,
-        y: angleAnchorY + dy - 4,
+        x: p.x + dx,
+        y: p.y + dy - 4,
         "font-size": depthFont,
         "font-weight": "700",
         fill: angleColor,

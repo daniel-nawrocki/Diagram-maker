@@ -267,13 +267,36 @@ function renderDiagram() {
   const minY = data.length ? Math.min(...ys) : 0;
   const maxY = data.length ? Math.max(...ys) : 100;
   const spanX = Math.max(1, maxX - minX), spanY = Math.max(1, maxY - minY);
-  const autoScale = Math.min((W - margin * 2) / spanX, (H - margin * 2) / spanY);
-  const scale = resolveDiagramScale(autoScale);
+  const meta = {
+    shot: $("metaShot").value,
+    face: $("metaFace").value,
+    interior: $("metaInterior").value,
+    diam: $("metaDiameter").value,
+    bench: $("metaBench").value,
+    date: $("metaDate").value,
+    notes: $("metaNotes")?.value || "",
+  };
+  const hudLayout = computeHudLayout(W, H, meta);
+  const drawableRect = computeDrawableRect({ x: 0, y: 0, width: W, height: H }, [hudLayout.metaRect, hudLayout.northArrowRect, hudLayout.angleKeyRect], 28);
+  const autoScale = Math.min((drawableRect.width - margin) / spanX, (drawableRect.height - margin) / spanY);
+  let scale = resolveDiagramScale(autoScale);
   const centerX = (minX + maxX) / 2;
   const centerY = (minY + maxY) / 2;
+  const centerTarget = {
+    x: drawableRect.x + drawableRect.width / 2,
+    y: drawableRect.y + drawableRect.height / 2,
+  };
+  let holeFieldRect = computeHoleFieldRect({ minX, maxX, minY, maxY }, centerTarget, scale);
+  let guard = 0;
+  while (guard < 24 && [hudLayout.metaRect, hudLayout.northArrowRect, hudLayout.angleKeyRect].some((r) => rectsIntersect(holeFieldRect, r))) {
+    scale *= 0.95;
+    holeFieldRect = computeHoleFieldRect({ minX, maxX, minY, maxY }, centerTarget, scale);
+    guard += 1;
+  }
+  console.assert(![hudLayout.metaRect, hudLayout.northArrowRect, hudLayout.angleKeyRect].some((r) => rectsIntersect(holeFieldRect, r)), "Hole field intersects reserved HUD area");
   const toSvg = (x, y) => ({
-    x: W / 2 + (x - centerX) * scale,
-    y: H / 2 - (y - centerY) * scale,
+    x: centerTarget.x + (x - centerX) * scale,
+    y: centerTarget.y - (y - centerY) * scale,
   });
 
   const root = el("g", { transform: `translate(${state.transform.tx},${state.transform.ty}) scale(${state.transform.scale})` });
@@ -347,7 +370,7 @@ function renderDiagram() {
   root.append(depthLabels);
   root.append(drawAnnotations());
   svg.append(root);
-  svg.append(drawFixedHud(W, H, spanX, scale, rotation));
+  svg.append(drawFixedHud(W, H, spanX, scale, rotation, hudLayout));
   renderTable();
 }
 
@@ -396,21 +419,16 @@ function drawAnnotations() {
   return g;
 }
 
-function drawFixedHud(W, H, spanX, scalePxPerUnit, rotationDeg = 0) {
+function drawFixedHud(W, H, spanX, scalePxPerUnit, rotationDeg = 0, hudLayout = computeHudLayout(W, H, {})) {
   const g = el("g", {});
-  const meta = {
-    shot: $("metaShot").value,
-    face: $("metaFace").value,
-    interior: $("metaInterior").value,
-    diam: $("metaDiameter").value,
-    bench: $("metaBench").value,
-    date: $("metaDate").value,
-  };
+  const meta = hudLayout.meta;
 
-  const northArrow = el("g", { transform: rotationDeg ? `rotate(${rotationDeg} ${W - 75} ${35})` : "" });
-  northArrow.append(el("line", { x1: W - 75, y1: 45, x2: W - 75, y2: 20, stroke: "#111827", "stroke-width": 1.5 }));
-  northArrow.append(el("polygon", { points: `${W - 75},14 ${W - 80},24 ${W - 70},24`, fill: "#111827" }));
-  northArrow.append(el("text", { x: W - 82, y: 58, "font-size": 11 }, "N"));
+  const northCenterX = hudLayout.northArrowRect.x + hudLayout.northArrowRect.width / 2;
+  const northCenterY = hudLayout.northArrowRect.y + hudLayout.northArrowRect.height / 2;
+  const northArrow = el("g", { transform: rotationDeg ? `rotate(${rotationDeg} ${northCenterX} ${northCenterY})` : "" });
+  northArrow.append(el("line", { x1: northCenterX, y1: hudLayout.northArrowRect.y + 30, x2: northCenterX, y2: hudLayout.northArrowRect.y + 8, stroke: "#111827", "stroke-width": 1.5 }));
+  northArrow.append(el("polygon", { points: `${northCenterX},${hudLayout.northArrowRect.y + 2} ${northCenterX - 5},${hudLayout.northArrowRect.y + 12} ${northCenterX + 5},${hudLayout.northArrowRect.y + 12}`, fill: "#111827" }));
+  northArrow.append(el("text", { x: northCenterX - 7, y: hudLayout.northArrowRect.y + hudLayout.northArrowRect.height - 3, "font-size": 11 }, "N"));
   g.append(northArrow);
 
   const targetUnits = chooseNiceScale(spanX / 5);
@@ -419,49 +437,155 @@ function drawFixedHud(W, H, spanX, scalePxPerUnit, rotationDeg = 0) {
   const scaleLabel = diagramScaleMode === "auto"
     ? "Auto"
     : `${Math.round(Number.parseFloat(diagramScaleMode) * 100)}%`;
-  g.append(el("line", { x1: 30, y1: H - 28, x2: 30 + px, y2: H - 28, stroke: "#111827", "stroke-width": 2 }));
-  g.append(el("line", { x1: 30, y1: H - 34, x2: 30, y2: H - 22, stroke: "#111827", "stroke-width": 1 }));
-  g.append(el("line", { x1: 30 + px, y1: H - 34, x2: 30 + px, y2: H - 22, stroke: "#111827", "stroke-width": 1 }));
-  g.append(el("text", { x: 30, y: H - 38, "font-size": 10 }, `${targetUnits.toFixed(0)} ${$("units").value}`));
-
-  const legendX = W - 300, legendY = H - 120;
-  g.append(el("rect", { x: legendX, y: legendY, width: 270, height: 116, fill: "white", stroke: "#9ca3af" }));
-  const rows = [
-    `Shot: ${meta.shot || "-"}`,
-    `Face: ${meta.face || "-"}`,
-    `Interior: ${meta.interior || "-"}`,
-    `Scale: ${scaleLabel}`,
-    `Hole Ø: ${meta.diam || "-"}`,
-    `Bench: ${meta.bench || "-"}    Date: ${meta.date || "-"}`,
-  ];
-  rows.forEach((t, i) => {
-    const x = legendX + 8;
-    const y = legendY + 18 + i * 16;
-    g.append(el("text", { x, y, "font-size": 11 }, t));
-  });
-
-  const colorScaleX = 30;
-  const colorScaleY = 30;
-  const colorScaleRows = Object.keys(ANGLE_COLORS)
-    .map((k) => Number.parseInt(k, 10))
-    .sort((a, b) => a - b);
-  const colorScaleHeight = 28 + colorScaleRows.length * 16;
   g.append(el("rect", {
-    x: colorScaleX,
-    y: colorScaleY,
-    width: 270,
-    height: colorScaleHeight,
+    x: hudLayout.metaRect.x,
+    y: hudLayout.metaRect.y,
+    width: hudLayout.metaRect.width,
+    height: hudLayout.metaRect.height,
     fill: "white",
     stroke: "#9ca3af",
   }));
-  g.append(el("text", { x: colorScaleX + 8, y: colorScaleY + 16, "font-size": 11, "font-weight": "700" }, "Angle color scale"));
-  colorScaleRows.forEach((angle, idx) => {
-    const y = colorScaleY + 30 + idx * 16;
-    const color = ANGLE_COLORS[angle];
-    g.append(el("line", { x1: colorScaleX + 10, y1: y - 4, x2: colorScaleX + 34, y2: y - 4, stroke: color, "stroke-width": 3 }));
-    g.append(el("text", { x: colorScaleX + 40, y: y, "font-size": 10, fill: "#111827" }, `${angle}°`));
+  hudLayout.metaLines.forEach((line, i) => {
+    const x = hudLayout.metaRect.x + hudLayout.metaStyle.padding;
+    const y = hudLayout.metaRect.y + hudLayout.metaStyle.padding + hudLayout.metaStyle.fontSize + i * hudLayout.metaStyle.lineHeight;
+    g.append(el("text", { x, y, "font-size": hudLayout.metaStyle.fontSize }, line));
   });
+
+  const colorScaleRows = hudLayout.angleRows;
+  g.append(el("rect", {
+    x: hudLayout.angleKeyRect.x,
+    y: hudLayout.angleKeyRect.y,
+    width: hudLayout.angleKeyRect.width,
+    height: hudLayout.angleKeyRect.height,
+    fill: "white",
+    stroke: "#9ca3af",
+  }));
+  colorScaleRows.forEach((angle, idx) => {
+    const y = hudLayout.angleKeyRect.y + hudLayout.angleStyle.padding + 6 + idx * hudLayout.angleStyle.rowHeight;
+    const color = ANGLE_COLORS[angle];
+    const swatchX = hudLayout.angleKeyRect.x + hudLayout.angleStyle.padding;
+    const labelX = swatchX + hudLayout.angleStyle.swatchWidth + 8;
+    g.append(el("line", { x1: swatchX, y1: y, x2: swatchX + hudLayout.angleStyle.swatchWidth, y2: y, stroke: color, "stroke-width": 2.4 }));
+    g.append(el("text", { x: labelX, y: y + 3, "font-size": hudLayout.angleStyle.fontSize, fill: "#111827" }, `${angle}°`));
+  });
+
+  const scaleX = hudLayout.metaRect.x;
+  const scaleY = H - 28;
+  g.append(el("line", { x1: scaleX, y1: scaleY, x2: scaleX + px, y2: scaleY, stroke: "#111827", "stroke-width": 2 }));
+  g.append(el("line", { x1: scaleX, y1: scaleY - 6, x2: scaleX, y2: scaleY + 6, stroke: "#111827", "stroke-width": 1 }));
+  g.append(el("line", { x1: scaleX + px, y1: scaleY - 6, x2: scaleX + px, y2: scaleY + 6, stroke: "#111827", "stroke-width": 1 }));
+  g.append(el("text", { x: scaleX, y: scaleY - 10, "font-size": 10 }, `${targetUnits.toFixed(0)} ${$("units").value} (${scaleLabel})`));
   return g;
+}
+
+function computeHudLayout(W, H, metaInput) {
+  const pageMargin = 24;
+  const rightMargin = 24;
+  const northArrow = { width: 42, height: 52 };
+  const angleGap = 14;
+  const metaStyle = { fontSize: 11, lineHeight: 14, padding: 8, maxWidth: 220 };
+  const angleStyle = { fontSize: 10, rowHeight: 14, padding: 8, swatchWidth: 28 };
+  const meta = {
+    shot: metaInput.shot || "",
+    face: metaInput.face || "",
+    interior: metaInput.interior || "",
+    diam: metaInput.diam || "",
+    bench: metaInput.bench || "",
+    date: metaInput.date || "",
+    notes: metaInput.notes || "",
+  };
+  const metaRows = [
+    ["Shot", meta.shot],
+    ["Face", meta.face],
+    ["Interior", meta.interior],
+    ["Scale", (Number.parseFloat($("diagramScale")?.value || "NaN") > 0 ? `${Math.round(Number.parseFloat($("diagramScale").value) * 100)}%` : "Auto")],
+    ["Hole Ø", meta.diam],
+    ["Bench", meta.bench],
+    ["Date", meta.date],
+    ["Notes", meta.notes],
+  ];
+  const metaLines = metaRows.flatMap(([label, value]) => wrapLabeledText(`${label}:`, value || "-", metaStyle.maxWidth - metaStyle.padding * 2, metaStyle.fontSize));
+  const longest = metaLines.reduce((max, line) => Math.max(max, measureTextWidth(line, metaStyle.fontSize)), 0);
+  const metaRect = {
+    x: pageMargin,
+    y: pageMargin,
+    width: Math.min(metaStyle.maxWidth, longest + metaStyle.padding * 2 + 2),
+    height: metaStyle.padding * 2 + metaStyle.lineHeight * metaLines.length,
+  };
+
+  const northArrowRect = {
+    x: W - rightMargin - northArrow.width,
+    y: pageMargin,
+    width: northArrow.width,
+    height: northArrow.height,
+  };
+  const angleRows = Object.keys(ANGLE_COLORS).map((k) => Number.parseInt(k, 10)).sort((a, b) => a - b);
+  const angleLabelsMax = angleRows.reduce((max, angle) => Math.max(max, measureTextWidth(`${angle}°`, angleStyle.fontSize)), 0);
+  const angleKeyRect = {
+    x: W - rightMargin - Math.min(120, angleStyle.padding * 2 + angleStyle.swatchWidth + 8 + angleLabelsMax + 2),
+    y: northArrowRect.y + northArrowRect.height + angleGap,
+    width: Math.min(120, angleStyle.padding * 2 + angleStyle.swatchWidth + 8 + angleLabelsMax + 2),
+    height: angleStyle.padding * 2 + angleRows.length * angleStyle.rowHeight,
+  };
+
+  return { meta, metaRect, northArrowRect, angleKeyRect, metaLines, metaStyle, angleRows, angleStyle };
+}
+
+function wrapLabeledText(prefix, value, maxWidth, fontSize) {
+  const wrapped = wrapText(`${prefix} ${value}`, maxWidth, fontSize);
+  return wrapped.length ? wrapped : [`${prefix} ${value}`];
+}
+
+function wrapText(text, maxWidth, fontSize) {
+  const words = String(text || "").split(/\s+/).filter(Boolean);
+  if (!words.length) return [""];
+  const lines = [];
+  let current = words[0];
+  for (let i = 1; i < words.length; i += 1) {
+    const candidate = `${current} ${words[i]}`;
+    if (measureTextWidth(candidate, fontSize) <= maxWidth) current = candidate;
+    else {
+      lines.push(current);
+      current = words[i];
+    }
+  }
+  lines.push(current);
+  return lines;
+}
+
+function measureTextWidth(text, fontSize) {
+  return String(text || "").length * fontSize * 0.56;
+}
+
+function computeDrawableRect(pageRect, reservedRects, safetyPadding = 28) {
+  const bounded = {
+    x: pageRect.x + safetyPadding,
+    y: pageRect.y + safetyPadding,
+    width: pageRect.width - safetyPadding * 2,
+    height: pageRect.height - safetyPadding * 2,
+  };
+  const topLimit = reservedRects.reduce((max, r) => Math.max(max, r.y + r.height), bounded.y) + safetyPadding;
+  return {
+    x: bounded.x,
+    y: Math.min(topLimit, pageRect.y + pageRect.height - 120),
+    width: bounded.width,
+    height: Math.max(120, pageRect.y + pageRect.height - Math.min(topLimit, pageRect.y + pageRect.height - 120) - safetyPadding),
+  };
+}
+
+function computeHoleFieldRect(bounds, centerPoint, scale) {
+  const width = Math.max(1, bounds.maxX - bounds.minX) * scale;
+  const height = Math.max(1, bounds.maxY - bounds.minY) * scale;
+  return {
+    x: centerPoint.x - width / 2,
+    y: centerPoint.y - height / 2,
+    width,
+    height,
+  };
+}
+
+function rectsIntersect(a, b) {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 function chooseNiceScale(v) {
   const mags = [1, 2, 5];
